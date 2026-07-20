@@ -1,4 +1,4 @@
-const navItems = ["文章", "服务", "工具", "联系"];
+const navItems = ["文章", "调研", "服务", "工具", "联系"];
 
 const topics = [
   {
@@ -34,6 +34,28 @@ const notes = [
   "怎样判断一辆车是否适合你的真实生活",
   "AI工具不是魔法，是把重复思考流程化",
   "信息差会赚钱，也会让人做错决定",
+];
+
+const retailPrinciples = [
+  {
+    title: "弱化属性，放大利益",
+    copy: "少讲高算力、冰箱、座舱参数，多讲它如何改变周末露营、家庭出行、补能安排和车内陪伴。",
+  },
+  {
+    title: "贩卖生态粘性",
+    copy: "用户买的不是一辆孤立的车，而是换电网络、车机互联、服务社群和智能周边组成的出行生态。",
+  },
+  {
+    title: "销售变成同行者",
+    copy: "真正有信任感的顾问，不急着说服用户，而是帮用户把生活痛点、预算边界和长期体验看清楚。",
+  },
+];
+
+const researchSteps = [
+  "明确对标对象：Apple Store、NIO House、乐道门店、理想零售空间。",
+  "化身神秘客：观察第一句话问预算，还是问你的真实使用场景。",
+  "访谈真实用户：追问他们买单是因为话术，还是因为体验到了生活价值。",
+  "拆解组织机制：了解员工是否背个人销售KPI，以及满意度、社群活跃度如何影响激励。",
 ];
 
 export default function Home() {
@@ -103,6 +125,39 @@ export default function Home() {
               <p>{topic.copy}</p>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="section research-section" id="调研">
+        <div className="research-lead">
+          <p className="eyebrow">Retail research</p>
+          <h2>把 Apple Store 的顾问式体验，迁移到汽车与科技零售。</h2>
+          <p>
+            我会持续研究一种更舒服的销售方式：去推销化、重生态体验、用生活场景解释产品价值。
+            它的底层逻辑不是话术漂亮，而是让用户在门店里感觉自己被理解、被帮助、被尊重。
+          </p>
+        </div>
+
+        <div className="principle-grid" aria-label="顾问式零售三大核心">
+          {retailPrinciples.map((item, index) => (
+            <article className="principle-card" key={item.title}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <h3>{item.title}</h3>
+              <p>{item.copy}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="research-playbook">
+          <div>
+            <p className="eyebrow">Mystery shopper playbook</p>
+            <h3>怎么调研一家门店是否真的“不推销”？</h3>
+          </div>
+          <ol>
+            {researchSteps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
         </div>
       </section>
 

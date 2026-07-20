@@ -293,9 +293,101 @@ h3 {
 
 .topic-card p,
 .service-section p,
+.research-lead p,
+.principle-card p,
 .note-strip p {
   color: var(--muted);
   line-height: 1.75;
+}
+
+.research-section {
+  background: #ffffff;
+}
+
+.research-lead {
+  max-width: 940px;
+}
+
+.research-lead p {
+  font-size: 19px;
+}
+
+.principle-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 34px;
+}
+
+.principle-card {
+  background: #f7f8f4;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 300px;
+  padding: 26px;
+}
+
+.principle-card span {
+  color: var(--gold);
+  display: block;
+  font-size: 13px;
+  font-weight: 900;
+  margin-bottom: 50px;
+}
+
+.research-playbook {
+  background: var(--ink);
+  border-radius: 8px;
+  color: #ffffff;
+  display: grid;
+  gap: 32px;
+  grid-template-columns: minmax(0, 0.6fr) minmax(300px, 0.8fr);
+  margin-top: 18px;
+  padding: clamp(28px, 5vw, 48px);
+}
+
+.research-playbook h3 {
+  color: #ffffff;
+  font-size: clamp(28px, 4vw, 44px);
+  margin-bottom: 0;
+}
+
+.research-playbook .eyebrow {
+  color: #f6c36f;
+}
+
+.research-playbook ol {
+  counter-reset: research;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.research-playbook li {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  color: #edf7f2;
+  line-height: 1.65;
+  padding: 18px 0 18px 42px;
+  position: relative;
+}
+
+.research-playbook li:first-child {
+  padding-top: 0;
+}
+
+.research-playbook li::before {
+  color: var(--gold);
+  content: counter(research, decimal-leading-zero);
+  counter-increment: research;
+  font-size: 13px;
+  font-weight: 900;
+  left: 0;
+  position: absolute;
+  top: 21px;
+}
+
+.research-playbook li:first-child::before {
+  top: 3px;
 }
 
 .service-section {
@@ -398,13 +490,19 @@ h3 {
   }
 
   .topic-grid,
+  .principle-grid,
   .note-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .section-heading,
+  .research-playbook,
   .contact-section {
     display: block;
+  }
+
+  .research-playbook ol {
+    margin-top: 26px;
   }
 
   .contact-section .primary-action {
@@ -433,6 +531,7 @@ h3 {
   }
 
   .topic-grid,
+  .principle-grid,
   .note-strip {
     grid-template-columns: 1fr;
   }
