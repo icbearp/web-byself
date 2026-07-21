@@ -88,8 +88,8 @@ const models: Record<
   },
   l80: {
     name: "乐道 L80",
-    subtitle: "大三排智能电动 SUV",
-    headline: "给二孩家庭、老人同乘和多人长途准备的更从容三排方案。",
+    subtitle: "智能双舱大五座旗舰 SUV",
+    headline: "给重视空间、装载和舒适体验的五口之家准备的大五座方案。",
     image: "https://image.nio.com/onvo-site/l80/kv/kv-pc.jpg",
     officialUrl: "https://www.onvo.cn/l80",
     sourceLabel: "官网车型页与 2026 年 5 月上市信息",
@@ -98,8 +98,8 @@ const models: Record<
         name: "Pro",
         vehiclePrice: 242800,
         baasPrice: 156800,
-        tag: "三排入门",
-        bestFor: "刚需 6/7 座，但预算仍希望可控。",
+        tag: "大五座入门",
+        bestFor: "刚需大五座空间，但预算仍希望可控。",
       },
       {
         name: "Max",
@@ -117,14 +117,14 @@ const models: Record<
       },
     ],
     highlights: [
-      "官方定位大三排 SUV，强调 6/7 座灵活布局。",
+      "官方定位智能双舱大五座旗舰 SUV，重点解决空间与装载的日常痛点。",
       "上市权益中提到多个舒适配置高价值标配，适合讲家庭体验而不是只讲清单。",
       "BaaS 方案门槛明显下降，适合先算首付压力再看长期用车成本。",
     ],
     lifestyle:
-      "L80 的意义不是简单变大，而是把家庭成员之间的关系处理得更轻松：老人上下车、孩子安全座椅、婴儿车和露营装备，都不再互相抢空间。",
+      "L80 的意义不是简单变大，而是把家庭生活装得更从容：婴儿车、骑行装备、露营用品和日常采购，都能在双舱空间里各得其所。",
     advisorNote:
-      "建议试驾时直接带上家庭成员，重点体验二三排进出、第三排腿部空间、满员时后备厢和孩子睡着后的车内安静感。",
+      "建议试驾时直接带上家庭成员，重点体验前备舱、后备舱、二排舒适度和装载灵活性，模拟一次真实的家庭出行。",
   },
   l90: {
     name: "乐道 L90",
@@ -144,7 +144,7 @@ const models: Record<
       {
         name: "Max",
         vehiclePrice: 289800,
-        baasPrice: 203800,
+        baasPrice: 193800,
         tag: "高频推荐",
         bestFor: "大家庭长途频率高，希望舒适和智能都更完整。",
       },
@@ -172,8 +172,8 @@ const knownOptions: KnownOption[] = [
   {
     id: "l60-rear-entertainment",
     label: "后排舒享娱乐套装",
-    price: 12800,
-    note: "官网披露该套装价值 12,800 元；L60 Ultra 已标配。",
+    price: 10000,
+    note: "官网披露该套装价格为 10,000 元；L60 Ultra 已标配。",
     models: ["l60"],
     excludedTrim: "Ultra",
   },
@@ -200,9 +200,9 @@ const scenarios: Record<
   kids: {
     label: "二孩家庭",
     title: "不只多一个座位，而是少很多家庭摩擦。",
-    model: "l80",
+    model: "l90",
     story:
-      "两个安全座椅、老人同乘、婴儿车和书包一起上车，L80 的三排空间会比纸面参数更有说服力。试驾时一定要模拟真实座位分配。",
+      "两个安全座椅、老人同乘、婴儿车和书包一起上车，L90 的六座或七座布局会比纸面参数更有说服力。试驾时一定要模拟真实座位分配。",
     checklist: ["6 座或 7 座", "第三排进出", "安全座椅位置", "满员后备厢"],
   },
   travel: {
