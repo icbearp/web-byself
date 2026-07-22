@@ -11,32 +11,32 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     metadataBase,
-    title: "周多福 | 乐道 L60/L80/L90 家庭购车指南",
+    title: "周多福 | 购车、效率与生活经验",
     description:
-      "周多福的乐道家庭购车指南，展示 L60、L80、L90 车型亮点、官方价格、选装预算计算和生活方式场景建议。",
+      "周多福的个人经验工作室，长期分享乐道购车建议、AI 效率工具、信息获取方法与生活选择。",
     icons: {
       icon: "/favicon.svg",
       shortcut: "/favicon.svg",
     },
     openGraph: {
-      title: "周多福 | 乐道 L60/L80/L90 家庭购车指南",
+      title: "周多福 | 购车、效率与生活经验",
       description:
-        "按家庭、生活方式和真实用车场景理解乐道车型，附官方价格和选装预算计算。",
+        "从真实生活场景出发，分享购车判断、效率经验、信息方法与长期选择。",
       type: "website",
       images: [
         {
           url: "/og.png",
           width: 1200,
           height: 630,
-          alt: "周多福乐道购车指南预览图",
+          alt: "周多福个人经验工作室预览图",
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: "周多福 | 乐道 L60/L80/L90 家庭购车指南",
+      title: "周多福 | 购车、效率与生活经验",
       description:
-        "乐道车型亮点、官方价格、选装预算和家庭场景购车建议。",
+        "购车建议、AI 效率工具、信息获取和生活经验。",
       images: ["/og.png"],
     },
   };
