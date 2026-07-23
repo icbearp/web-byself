@@ -661,10 +661,36 @@ h3 {
   color: #f0c167;
 }
 
-.contact-section .primary-action {
-  background: #fff;
-  color: var(--ink);
-  flex: 0 0 auto;
+.contact-methods {
+  display: grid;
+  flex: 0 0 min(520px, 46vw);
+  gap: 10px;
+}
+
+.contact-method {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  color: #fff;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 0 18px;
+}
+
+.contact-method span {
+  color: #f0c167;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.contact-method strong {
+  font-size: 18px;
+  text-align: right;
+  word-break: break-word;
 }
 
 @media (max-width: 1024px) {
@@ -706,6 +732,10 @@ h3 {
   .section-heading,
   .contact-section {
     display: block;
+  }
+
+  .contact-methods {
+    margin-top: 24px;
   }
 
   .price-row,
@@ -1153,6 +1183,10 @@ h3 {
 
   .section-heading {
     display: block;
+  }
+
+  .contact-methods {
+    flex-basis: auto;
   }
 
   .section-lead {

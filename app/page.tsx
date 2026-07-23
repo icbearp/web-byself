@@ -64,6 +64,24 @@ const profile = {
   promise: ["讲清楚价格和边界", "尊重每个家庭的生活方式", "把能复用的方法留下来"],
 };
 
+const contactMethods = [
+  {
+    label: "小红书号",
+    value: "191425657",
+    href: "https://www.xiaohongshu.com/user/profile/191425657",
+  },
+  {
+    label: "邮箱",
+    value: "otafukuchau@gmail.com",
+    href: "mailto:otafukuchau@gmail.com",
+  },
+  {
+    label: "电话",
+    value: "15993551315",
+    href: "tel:15993551315",
+  },
+];
+
 const columns: Column[] = [
   {
     key: "car",
@@ -300,7 +318,7 @@ export default function Home() {
       <section className="section profile-section" id="about">
         <div className="profile-card">
           <div className="profile-mark">周</div>
-          <div><p className="eyebrow">About the person behind the page</p><h2>{profile.name}</h2><p className="profile-role">{profile.role}</p><p>{profile.intro}</p><a className="text-link" href="mailto:hello@zhouduofu.com">发邮件聊聊 →</a></div>
+          <div><p className="eyebrow">About the person behind the page</p><h2>{profile.name}</h2><p className="profile-role">{profile.role}</p><p>{profile.intro}</p><a className="text-link" href="mailto:otafukuchau@gmail.com">发邮件聊聊 →</a></div>
         </div>
         <div className="profile-notes"><p className="eyebrow">个人信息维护</p><h3>让访客知道为什么可以信任这里的内容。</h3><ul>{profile.promise.map((item) => <li key={item}>{item}</li>)}</ul><p className="muted-note">这个区域以后可以继续维护个人经历、服务城市、预约方式和最新状态，主页结构已经预留好位置。</p></div>
       </section>
@@ -332,7 +350,7 @@ export default function Home() {
 
       <section className="section source-section"><div><p className="eyebrow">Sources</p><h2>价格和车型信息从官网来，判断从真实生活来。</h2></div><ul>{(Object.keys(models) as ModelKey[]).map((modelKey) => <li key={modelKey}><a href={models[modelKey].officialUrl} target="_blank" rel="noreferrer">{models[modelKey].name}</a><span>{models[modelKey].sourceLabel}</span></li>)}<li><a href="https://www.onvo.cn/news" target="_blank" rel="noreferrer">乐道官网新闻</a><span>用于核对上市、价格、权益和车型定位。</span></li></ul></section>
 
-      <section className="contact-section" id="contact"><div><p className="eyebrow">Contact</p><h2>想看车、试驾，或者想把一个生活问题聊清楚，可以从这里开始。</h2></div><a className="primary-action" href="mailto:hello@zhouduofu.com">发邮件给周多福 →</a></section>
+      <section className="contact-section" id="contact"><div><p className="eyebrow">Contact</p><h2>想看车、试驾，或者想把一个生活问题聊清楚，可以从这里开始。</h2></div><div className="contact-methods">{contactMethods.map((method) => <a className="contact-method" href={method.href} key={method.label} target={method.label === "小红书号" ? "_blank" : undefined} rel={method.label === "小红书号" ? "noreferrer" : undefined}><span>{method.label}</span><strong>{method.value}</strong></a>)}</div></section>
     </main>
   );
 }
