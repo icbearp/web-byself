@@ -50,6 +50,7 @@ type EfficiencyNote = {
 
 const navItems = [
   { label: "关于我", href: "#about" },
+  { label: "每日记录", href: "#daily-record" },
   { label: "四个专栏", href: "#columns" },
   { label: "效率经验", href: "#efficiency" },
   { label: "乐道车型", href: "#models" },
@@ -80,6 +81,38 @@ const contactMethods = [
     value: "15993551315",
     href: "tel:15993551315",
   },
+];
+
+const dailyRecord = {
+  date: "2026-07-24",
+  tag: "#买车的初阶段",
+  title: "把门店邀约当成服务，而不是催促",
+  paragraphs: [
+    "其实，只要最近开始了解车，很多车企都会频繁打电话、邀约试驾，后续跟进也会很多。对一些人来说，这会特别反感；但如果把它看成一种服务和出行体验，感受就会完全不一样。",
+    "免费的上门接送、试驾安排、礼品和门店陪同，本质上都在帮助你更快把信息补齐。如果还是觉得打扰，直接告诉服务人员，请他们在后台备注，后面通常就不会再继续打扰。",
+    "买车的决策周期往往就那么几天，但你不一定要被催着在几天内做决定。真正重要的，不是赶着下单，而是用心把决策做对。",
+  ],
+  takeaway: "把买车当成一次需要认真完成的决策，而不是一次被动催促的消费。",
+};
+
+const purchaseStages = [
+  { step: "01", title: "初买车打算", note: "先确认自己为什么要买车，是否真的需要换车或新增一台。" },
+  { step: "02", title: "网上了解", note: "看官网、口碑、测评和政策，先建立基础认知。" },
+  { step: "03", title: "线下了解", note: "进店看实车、摸材质、问清服务和交付流程。" },
+  { step: "04", title: "对比", note: "横向看竞品，把价格、空间、补能和权益放在一起。" },
+  { step: "05", title: "体验", note: "试驾、试乘和后排体验，感受它是否真的适合家人。" },
+  { step: "06", title: "预算", note: "整车、BaaS、保险、补能和停车一起算总账。" },
+  { step: "07", title: "沟通", note: "和顾问确认权益、交期、服务和可能的疑问。" },
+  { step: "08", title: "订车", note: "确定版本、颜色和交付节奏，完成下定。" },
+  { step: "09", title: "交付", note: "验车、提车、熟悉功能，把车真正接回家。" },
+  { step: "10", title: "交付后的生命周期服务", note: "补能、售后、升级、社区和用车问题处理，才是长期体验的开始。" },
+];
+
+const deliveryServices = [
+  "一键服务和透明跟进",
+  "上门取送车与道路救援",
+  "换电 / 补能和日常使用支持",
+  "社区、活动和长期用户陪伴",
 ];
 
 const columns: Column[] = [
@@ -314,6 +347,65 @@ export default function Home() {
       </section>
 
       <section className="intro-band"><p>这里的每一块内容都有一个去处：先认识我，再读专栏；想提高效率，就看方法；准备买车，就进入场景和计算器。</p></section>
+
+      <section className="section daily-record-section" id="daily-record">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Daily record</p>
+            <h2>今天的记录，先写成可以反复引用的一段话。</h2>
+          </div>
+          <p className="section-lead">日期、标签、观点和购车阶段，一次整理清楚，后面就能持续积累。</p>
+        </div>
+
+        <div className="daily-layout">
+          <article className="daily-entry">
+            <div className="daily-meta">
+              <span>{dailyRecord.date}</span>
+              <span>{dailyRecord.tag}</span>
+            </div>
+            <h3>{dailyRecord.title}</h3>
+            {dailyRecord.paragraphs.map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+            <div className="daily-takeaway">
+              <span>记录结论</span>
+              <strong>{dailyRecord.takeaway}</strong>
+            </div>
+          </article>
+
+          <div className="daily-sidebar">
+            <section className="timeline-card" id="journey">
+              <p className="eyebrow">Buyer's journey</p>
+              <h3>买车阶段时间线</h3>
+              <ol className="journey-list">
+                {purchaseStages.map((item) => (
+                  <li key={item.step}>
+                    <span>{item.step}</span>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <p>{item.note}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <section className="delivery-card">
+              <p className="eyebrow">Delivery service</p>
+              <h3>交付后的用车生命周期服务</h3>
+              <p>
+                对蔚来这类用户企业来说，交付不是结束，而是长期服务和生态体验的开始。
+                重点不只是把车交出去，而是让后面的用车问题、补能、售后和社区体验都能持续被接住。
+              </p>
+              <ul>
+                {deliveryServices.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </section>
+          </div>
+        </div>
+      </section>
 
       <section className="section profile-section" id="about">
         <div className="profile-card">
