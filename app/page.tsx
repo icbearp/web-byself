@@ -83,18 +83,32 @@ const contactMethods = [
   },
 ];
 
-const dailyRecord = {
-  date: "2026-07-24",
-  tag: "#买车成本与用车思考",
-  title: "买车不是只看首付，更要看长期成本",
-  paragraphs: [
-    "如果考虑电车，真正需要看的，不是单纯的购车价格，而是买车阶段的成本，以及后续用车阶段会面临的长期成本。对我来说，续航表现、充电便利性和电池衰减带来的成本变化，才是判断一台电车是否值得买的核心。",
-    "换电的模式，能让车主在续航和电池寿命上获得更大的确定性。它不仅可以减少因续航焦虑带来的使用成本，还能让用户更容易享受未来电池技术升级带来的续航提升和整体用车成本下降。",
-    "如果电池不能换，续航会被锁死，随着时间推移，电池性能也会逐步下降。未来电池技术升级后，旧电池的价值会被弱化，几年后若要更换时，成本往往不低，整台车的性价比也会受到影响。",
-    "从这个角度看，能换电的方案，实际上是在降低长期风险：更少担心被技术淘汰、相对更有保值空间，也更容易让车在未来的二手市场中保持更好的竞争力。",
-  ],
-  takeaway: "买车时不只看首付，更要把买车阶段的成本、长期用车成本和未来保值风险一起算清楚。",
-};
+const dailyRecords = [
+  {
+    date: "2026-07-24",
+    tag: "#买车成本与用车思考",
+    title: "买车不是只看首付，更要看长期成本",
+    paragraphs: [
+      "如果考虑电车，真正需要看的，不是单纯的购车价格，而是买车阶段的成本，以及后续用车阶段会面临的长期成本。对我来说，续航表现、充电便利性和电池衰减带来的成本变化，才是判断一台电车是否值得买的核心。",
+      "换电的模式，能让车主在续航和电池寿命上获得更大的确定性。它不仅可以减少因续航焦虑带来的使用成本，还能让用户更容易享受未来电池技术升级带来的续航提升和整体用车成本下降。",
+      "如果电池不能换，续航会被锁死，随着时间推移，电池性能也会逐步下降。未来电池技术升级后，旧电池的价值会被弱化，几年后若要更换时，成本往往不低，整台车的性价比也会受到影响。",
+      "从这个角度看，能换电的方案，实际上是在降低长期风险：更少担心被技术淘汰、相对更有保值空间，也更容易让车在未来的二手市场中保持更好的竞争力。",
+    ],
+    takeaway: "买车时不只看首付，更要把买车阶段的成本、长期用车成本和未来保值风险一起算清楚。",
+  },
+  {
+    date: "2026-07-26",
+    tag: "#电动车用车判断",
+    title: "电动车的价值，不只是续航，而是未来的长期使用体验",
+    paragraphs: [
+      "今天重新梳理自己对电动车的判断：真正值得关注的，不是短期内的续航数字，而是未来几年里，它能不能持续提供稳定、低成本、可升级的使用体验。",
+      "对于我来说，买车阶段的成本固然重要，但真正决定一台车是否值得买的，往往是后续的充电便利性、续航稳定性、电池衰减速度和换电方案。",
+      "换电的意义不只是解决续航焦虑，更重要的是让未来电池技术升级真正变成红利。电池可以更新，续航可以提升，整体用车成本也更有机会被持续拉低。",
+      "如果不能换电，电池性能会随着时间降低，后续升级和更换的成本会越来越高，车的使用体验和保值空间也会被压缩。",
+    ],
+    takeaway: "买车时不只看当下的价格和续航，更要看未来几年能不能持续省钱、保值和升级。",
+  },
+];
 
 const purchaseStages = [
   { step: "01", title: "初买车打算", note: "先确认自己为什么要买车，是否真的需要换车或新增一台。" },
@@ -359,20 +373,24 @@ export default function Home() {
         </div>
 
         <div className="daily-layout">
-          <article className="daily-entry">
-            <div className="daily-meta">
-              <span>{dailyRecord.date}</span>
-              <span>{dailyRecord.tag}</span>
-            </div>
-            <h3>{dailyRecord.title}</h3>
-            {dailyRecord.paragraphs.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
+          <div className="daily-entry-list">
+            {dailyRecords.map((entry) => (
+              <article className="daily-entry" key={entry.date}>
+                <div className="daily-meta">
+                  <span>{entry.date}</span>
+                  <span>{entry.tag}</span>
+                </div>
+                <h3>{entry.title}</h3>
+                {entry.paragraphs.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+                <div className="daily-takeaway">
+                  <span>记录结论</span>
+                  <strong>{entry.takeaway}</strong>
+                </div>
+              </article>
             ))}
-            <div className="daily-takeaway">
-              <span>记录结论</span>
-              <strong>{dailyRecord.takeaway}</strong>
-            </div>
-          </article>
+          </div>
 
           <div className="daily-sidebar">
             <section className="timeline-card" id="journey">
