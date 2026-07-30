@@ -72,6 +72,62 @@ type LoanQuote = {
   lastPayment: number;
 };
 
+type FinanceFormState = {
+  selectedModel: ModelKey;
+  selectedTrim: string;
+  purchaseMode: PurchaseMode;
+  financeMode: FinanceMode;
+  purchaseTaxMode: PurchaseTaxMode;
+  manualVehiclePrice: number;
+  selectedOptions: string[];
+  customBudget: number;
+  downPaymentRate: number;
+  financeYears: number;
+  annualRate: number;
+  ownershipYears: number;
+  vatRate: number;
+  insuranceFee: number;
+  registrationFee: number;
+  financeServiceFee: number;
+  batteryRentMonthly: number;
+  chargingMonthly: number;
+  parkingMonthly: number;
+  maintenanceMonthly: number;
+  customerName: string;
+  billTitle: string;
+  billNote: string;
+};
+
+type FinanceSnapshotItem = {
+  label: string;
+  amount: number;
+  note: string;
+};
+
+type FinanceBillSnapshot = FinanceFormState & {
+  generatedAt: string;
+  currentModelName: string;
+  currentTrimName: string;
+  vehicleSubtotal: number;
+  purchaseTax: number;
+  downPaymentAmount: number;
+  loanPrincipal: number;
+  loanTermMonths: number;
+  loanQuote: LoanQuote;
+  batteryRentTotal: number;
+  monthlyRunningCost: number;
+  monthlyTotalFirstYear: number;
+  ownershipTotal: number;
+  upfrontItems: FinanceSnapshotItem[];
+  monthlyItems: FinanceSnapshotItem[];
+};
+
+type SavedFinanceBill = {
+  id: string;
+  createdAt: string;
+  snapshot: FinanceBillSnapshot;
+};
+
 const navItems = [
   { label: "关于我", href: "#about" },
   { label: "每日记录", href: "#daily-record" },
@@ -458,6 +514,183 @@ function calculateLoanQuote(principal: number, annualRate: number, months: numbe
   };
 }
 
+const BILL_STORAGE_KEY = "zhouduofu-finance-bills-v2";
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function makeCsvValue(value: string) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+function downloadText(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildCsv(snapshot: FinanceBillSnapshot) {
+  const rows = [
+    ["分类", "项目", "金额（元）", "说明"],
+    ["概要", "称呼", snapshot.customerName, snapshot.billTitle],
+    ["概要", "车型", `${snapshot.currentModelName} / ${snapshot.currentTrimName}`, snapshot.purchaseMode === "baas" ? "BaaS 租电" : "整车购买"],
+    ["概要", "生成时间", snapshot.generatedAt, snapshot.billNote],
+    ["一次性", "车辆小计", String(Math.round(snapshot.vehicleSubtotal)), "车辆成交价、官方选装、自定义预算"],
+    ["一次性", "首付现金", String(Math.round(snapshot.downPaymentAmount)), `首付比例 ${snapshot.downPaymentRate}%`],
+    ["一次性", "购置税", String(Math.round(snapshot.purchaseTax)), snapshot.purchaseTaxMode === "new-energy" ? "新能源减半口径" : "普通车辆 10% 口径"],
+    ["一次性", "首年保险", String(Math.round(snapshot.insuranceFee)), "按实际报价替换"],
+    ["一次性", "上牌登记", String(Math.round(snapshot.registrationFee)), "临牌、登记、代办等"],
+    ["一次性", "金融服务费", String(Math.round(snapshot.financeServiceFee)), "如无则为 0"],
+    ["每月", "金融月供", String(Math.round(snapshot.loanQuote.firstPayment)), snapshot.financeMode === "equal-principal" ? "首月月供，后续递减" : snapshot.financeMode === "interest-free" ? "免息分期" : "等额本息"],
+    ["每月", "BaaS 月租", String(Math.round(snapshot.batteryRentMonthly)), snapshot.purchaseMode === "baas" ? "租电方案月费" : "未启用 BaaS"],
+    ["每月", "充电 / 换电", String(Math.round(snapshot.chargingMonthly)), "按个人里程估算"],
+    ["每月", "停车", String(Math.round(snapshot.parkingMonthly)), "车位或临停"],
+    ["每月", "保养及杂费", String(Math.round(snapshot.maintenanceMonthly)), "洗车、耗材、轮胎等"],
+    ["汇总", "首月综合支出", String(Math.round(snapshot.monthlyTotalFirstYear)), "月供 + 月租 + 运行成本"],
+    ["汇总", "贷款本金", String(Math.round(snapshot.loanPrincipal)), "扣除首付后的贷款金额"],
+    ["汇总", "总利息", String(Math.round(snapshot.loanQuote.totalInterest)), "仅供估算"],
+    ["汇总", `${snapshot.ownershipYears} 年总成本`, String(Math.round(snapshot.ownershipTotal)), "首付 + 月供 + 税费 + 月度支出"],
+  ];
+
+  return rows.map((row) => row.map(makeCsvValue).join(",")).join("\n");
+}
+
+function buildBillDocument(snapshot: FinanceBillSnapshot) {
+  const upfrontRows = snapshot.upfrontItems
+    .map(
+      (item) => `
+        <tr>
+          <td>${escapeHtml(item.label)}</td>
+          <td>${formatPrice(item.amount)}</td>
+          <td>${escapeHtml(item.note)}</td>
+        </tr>`,
+    )
+    .join("");
+
+  const monthlyRows = snapshot.monthlyItems
+    .map(
+      (item) => `
+        <tr>
+          <td>${escapeHtml(item.label)}</td>
+          <td>${formatPrice(item.amount)}</td>
+          <td>${escapeHtml(item.note)}</td>
+        </tr>`,
+    )
+    .join("");
+
+  const bars = snapshot.loanQuote.monthlyPayments
+    .slice(0, 12)
+    .map(
+      (payment, index) => `
+        <div class="bar">
+          <span style="height:${Math.max(8, (payment / Math.max(...snapshot.loanQuote.monthlyPayments.slice(0, 12), 1)) * 100)}%"></span>
+          <b>${index + 1}</b>
+        </div>`,
+    )
+    .join("");
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(snapshot.billTitle)} - 金融账单</title>
+  <style>
+    :root{--bg:#f6f4ef;--ink:#10221c;--muted:#5b675f;--line:#d8ddd6;--green:#2d8a67;--gold:#c98a27;}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Arial,"PingFang SC","Microsoft YaHei",sans-serif}
+    .page{max-width:1120px;margin:0 auto;padding:40px 24px 56px}
+    .hero{background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px 28px 22px;box-shadow:0 18px 42px rgba(16,34,28,.08)}
+    .hero-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap}
+    .eyebrow{color:var(--green);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 10px}
+    h1{margin:0 0 10px;font-size:34px;line-height:1.08}
+    .lead{color:var(--muted);line-height:1.7;max-width:760px;margin:0}
+    .badge{background:#eef4ef;border:1px solid #d7e5db;border-radius:999px;padding:10px 14px;color:var(--green);font-weight:800;white-space:nowrap}
+    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:20px}
+    .metric{background:#f8faf7;border:1px solid var(--line);border-radius:14px;padding:14px}
+    .metric span{display:block;color:var(--muted);font-size:12px;margin-bottom:8px}
+    .metric strong{font-size:22px}
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;margin-top:18px}
+    .card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px}
+    h2{margin:0 0 14px;font-size:22px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+    td:nth-child(2){text-align:right;font-weight:700;white-space:nowrap}
+    .note{color:var(--muted);font-size:13px;line-height:1.65}
+    .bars{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px;height:160px;align-items:end;margin-top:6px}
+    .bar{display:grid;gap:8px;align-items:end;justify-items:center}
+    .bar span{width:100%;border-radius:12px 12px 3px 3px;background:linear-gradient(180deg,var(--green),rgba(45,138,103,.25));min-height:8px}
+    .bar b{font-size:11px;color:var(--muted)}
+    .footer{margin-top:18px;color:var(--muted);font-size:12px;line-height:1.6}
+    @media print{body{background:#fff}.page{padding:0}.hero,.card{box-shadow:none}}
+    @media (max-width:860px){.metrics,.grid{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}.hero-top{display:block}}
+    @media (max-width:560px){.metrics{grid-template-columns:1fr}.h1{font-size:28px}}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="hero-top">
+        <div>
+          <p class="eyebrow">Finance bill</p>
+          <h1>${escapeHtml(snapshot.billTitle)}</h1>
+          <p class="lead">${escapeHtml(snapshot.customerName)} 的购车金融账单，生成于 ${escapeHtml(snapshot.generatedAt)}。车型：${escapeHtml(snapshot.currentModelName)} / ${escapeHtml(snapshot.currentTrimName)}。${escapeHtml(snapshot.billNote)}</p>
+        </div>
+        <div class="badge">${escapeHtml(snapshot.purchaseMode === "baas" ? "BaaS 租电方案" : "整车购买方案")}</div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span>首月综合支出</span><strong>${formatPrice(snapshot.monthlyTotalFirstYear)}</strong></div>
+        <div class="metric"><span>贷款本金</span><strong>${formatPrice(snapshot.loanPrincipal)}</strong></div>
+        <div class="metric"><span>首付现金</span><strong>${formatPrice(snapshot.downPaymentAmount)}</strong></div>
+        <div class="metric"><span>${snapshot.ownershipYears} 年总成本</span><strong>${formatPrice(snapshot.ownershipTotal)}</strong></div>
+      </div>
+    </section>
+    <div class="grid">
+      <section class="card">
+        <h2>一次性落地清单</h2>
+        <table>
+          <thead><tr><th>项目</th><th>金额</th><th>说明</th></tr></thead>
+          <tbody>${upfrontRows}</tbody>
+        </table>
+      </section>
+      <section class="card">
+        <h2>前 12 个月月供趋势</h2>
+        <div class="bars">${bars}</div>
+        <p class="note">等额本金会逐月下降；等额本息和免息分期更平滑。你可以把这份账单直接发给家人一起看。</p>
+      </section>
+    </div>
+    <div class="grid">
+      <section class="card">
+        <h2>每月使用清单</h2>
+        <table>
+          <thead><tr><th>项目</th><th>金额</th><th>说明</th></tr></thead>
+          <tbody>${monthlyRows}</tbody>
+        </table>
+      </section>
+      <section class="card">
+        <h2>口径说明</h2>
+        <p class="note">等额本息 = 本金 × 月利率 × (1 + 月利率)^期数 ÷ [(1 + 月利率)^期数 - 1]。等额本金按固定本金递减计息。新能源购置税与 BaaS 月租均按页面输入估算，最终以合同为准。</p>
+        <p class="note">这份文档适合作为个人账单、家庭讨论页或销售沟通页使用。</p>
+      </section>
+    </div>
+    <p class="footer">周多福 · 购车金融账单</p>
+  </div>
+</body>
+</html>`;
+}
+
 export default function Home() {
   const [selectedRecordCategory, setSelectedRecordCategory] = useState<RecordCategoryKey | "all">("all");
   const [selectedStage, setSelectedStage] = useState<StageKey | "all">("all");
@@ -487,6 +720,11 @@ export default function Home() {
   const [parkingMonthly, setParkingMonthly] = useState(0);
   const [maintenanceMonthly, setMaintenanceMonthly] = useState(0);
   const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>("commute");
+  const [customerName, setCustomerName] = useState("周先生");
+  const [billTitle, setBillTitle] = useState("乐道购车金融账单");
+  const [billNote, setBillNote] = useState("用于家庭讨论、试驾沟通和长期预算确认。");
+  const [savedBills, setSavedBills] = useState<SavedFinanceBill[]>([]);
+  const [savedBillsLoaded, setSavedBillsLoaded] = useState(false);
 
   const filteredArticles = useMemo(() => {
     const query = articleQuery.trim().toLowerCase();
@@ -553,18 +791,90 @@ export default function Home() {
     { label: "停车", amount: parkingMonthly, note: "车位、临停或单位停车费用" },
     { label: "保养及杂费", amount: maintenanceMonthly, note: "洗车、耗材、轮胎、保养等长期支出" },
   ];
+  const currentBillSnapshot: FinanceBillSnapshot = {
+    selectedModel,
+    selectedTrim,
+    purchaseMode,
+    financeMode,
+    purchaseTaxMode,
+    manualVehiclePrice,
+    selectedOptions,
+    customBudget,
+    downPaymentRate,
+    financeYears,
+    annualRate,
+    ownershipYears,
+    vatRate,
+    insuranceFee,
+    registrationFee,
+    financeServiceFee,
+    batteryRentMonthly,
+    chargingMonthly,
+    parkingMonthly,
+    maintenanceMonthly,
+    customerName,
+    billTitle,
+    billNote,
+    generatedAt: new Intl.DateTimeFormat("zh-CN", { dateStyle: "full", timeStyle: "short" }).format(new Date()),
+    currentModelName: currentModel.name,
+    currentTrimName: currentTrim.name,
+    vehicleSubtotal,
+    purchaseTax,
+    downPaymentAmount,
+    loanPrincipal,
+    loanTermMonths,
+    loanQuote,
+    batteryRentTotal,
+    monthlyRunningCost,
+    monthlyTotalFirstYear,
+    ownershipTotal,
+    upfrontItems: upfrontFeeItems,
+    monthlyItems: monthlyFeeItems,
+  };
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(BILL_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as SavedFinanceBill[];
+      if (Array.isArray(parsed)) {
+        setSavedBills(parsed.slice(0, 12));
+      }
+    } catch {
+      setSavedBills([]);
+    } finally {
+      setSavedBillsLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!savedBillsLoaded) return;
+    try {
+      window.localStorage.setItem(BILL_STORAGE_KEY, JSON.stringify(savedBills.slice(0, 12)));
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [savedBills, savedBillsLoaded]);
 
   function chooseModel(modelKey: ModelKey) {
     setSelectedModel(modelKey);
     setSelectedTrim(models[modelKey].trims[1]?.name ?? models[modelKey].trims[0].name);
     setSelectedOptions([]);
     setCustomBudget(0);
+    setManualVehiclePrice(purchaseMode === "vehicle" ? models[modelKey].trims[1]?.vehiclePrice ?? models[modelKey].trims[0].vehiclePrice : models[modelKey].trims[1]?.baasPrice ?? models[modelKey].trims[0].baasPrice);
   }
 
-  useEffect(() => {
-    const defaultPrice = purchaseMode === "vehicle" ? currentTrim.vehiclePrice : currentTrim.baasPrice;
-    setManualVehiclePrice(defaultPrice);
-  }, [currentTrim.baasPrice, currentTrim.vehiclePrice, purchaseMode]);
+  function chooseTrim(trimName: string) {
+    const trim = currentModel.trims.find((item) => item.name === trimName) ?? currentModel.trims[0];
+    setSelectedTrim(trim.name);
+    setSelectedOptions([]);
+    setManualVehiclePrice(purchaseMode === "vehicle" ? trim.vehiclePrice : trim.baasPrice);
+  }
+
+  function switchPurchaseMode(mode: PurchaseMode) {
+    setPurchaseMode(mode);
+    setManualVehiclePrice(mode === "vehicle" ? currentTrim.vehiclePrice : currentTrim.baasPrice);
+  }
 
   function toggleOption(option: KnownOption) {
     if (option.excludedTrim === currentTrim.name) return;
@@ -578,6 +888,64 @@ export default function Home() {
     if (preset.annualRate !== undefined) {
       setAnnualRate(preset.annualRate);
     }
+  }
+
+  function saveCurrentBill() {
+    const savedAt = new Date().toISOString();
+    const id = `${selectedModel}-${Date.now()}`;
+    const snapshot = { ...currentBillSnapshot, generatedAt: new Intl.DateTimeFormat("zh-CN", { dateStyle: "full", timeStyle: "short" }).format(new Date()) };
+    setSavedBills((current) => [
+      {
+        id,
+        createdAt: savedAt,
+        snapshot,
+      },
+      ...current.slice(0, 11),
+    ]);
+  }
+
+  function loadSavedBill(item: SavedFinanceBill) {
+    const form = item.snapshot;
+    setSelectedModel(form.selectedModel);
+    setSelectedTrim(form.selectedTrim);
+    setPurchaseMode(form.purchaseMode);
+    setFinanceMode(form.financeMode);
+    setPurchaseTaxMode(form.purchaseTaxMode);
+    setManualVehiclePrice(form.manualVehiclePrice);
+    setSelectedOptions(form.selectedOptions);
+    setCustomBudget(form.customBudget);
+    setDownPaymentRate(form.downPaymentRate);
+    setFinanceYears(form.financeYears);
+    setAnnualRate(form.annualRate);
+    setOwnershipYears(form.ownershipYears);
+    setVatRate(form.vatRate);
+    setInsuranceFee(form.insuranceFee);
+    setRegistrationFee(form.registrationFee);
+    setFinanceServiceFee(form.financeServiceFee);
+    setBatteryRentMonthly(form.batteryRentMonthly);
+    setChargingMonthly(form.chargingMonthly);
+    setParkingMonthly(form.parkingMonthly);
+    setMaintenanceMonthly(form.maintenanceMonthly);
+    setCustomerName(form.customerName);
+    setBillTitle(form.billTitle);
+    setBillNote(form.billNote);
+  }
+
+  function exportBillSnapshot(snapshot: FinanceBillSnapshot, kind: "csv" | "html") {
+    const safeName = snapshot.billTitle.replace(/[\\/:*?"<>|]+/g, "_").trim() || "finance-bill";
+    if (kind === "csv") {
+      downloadText(`${safeName}.csv`, buildCsv(snapshot), "text/csv");
+      return;
+    }
+    downloadText(`${safeName}.html`, buildBillDocument(snapshot), "text/html");
+  }
+
+  function exportCurrentBill(kind: "csv" | "html") {
+    exportBillSnapshot(currentBillSnapshot, kind);
+  }
+
+  function deleteSavedBill(id: string) {
+    setSavedBills((current) => current.filter((item) => item.id !== id));
   }
 
   function chooseRecordCategory(category: RecordCategoryKey | "all") {
@@ -790,10 +1158,7 @@ export default function Home() {
                     type="button"
                     className={currentTrim.name === trim.name ? "trim-card active" : "trim-card"}
                     key={trim.name}
-                    onClick={() => {
-                      setSelectedTrim(trim.name);
-                      setSelectedOptions([]);
-                    }}
+                    onClick={() => chooseTrim(trim.name)}
                   >
                     <span>{trim.tag}</span>
                     <strong>{trim.name}</strong>
@@ -841,8 +1206,8 @@ export default function Home() {
             <div className="control-group">
               <span className="control-label">购买方式</span>
               <div className="segmented">
-                <button type="button" className={purchaseMode === "vehicle" ? "active" : ""} onClick={() => setPurchaseMode("vehicle")}>整车购买</button>
-                <button type="button" className={purchaseMode === "baas" ? "active" : ""} onClick={() => setPurchaseMode("baas")}>BaaS 电池租用</button>
+                <button type="button" className={purchaseMode === "vehicle" ? "active" : ""} onClick={() => switchPurchaseMode("vehicle")}>整车购买</button>
+                <button type="button" className={purchaseMode === "baas" ? "active" : ""} onClick={() => switchPurchaseMode("baas")}>BaaS 电池租用</button>
               </div>
             </div>
 
@@ -909,6 +1274,21 @@ export default function Home() {
                 <input min="0" step="50" type="number" value={maintenanceMonthly} onChange={(event) => setMaintenanceMonthly(Math.max(0, Number(event.target.value) || 0))} />
               </label>
             </div>
+
+            <div className="bill-form-grid">
+              <label className="budget-input">
+                <span>用户称呼</span>
+                <input type="text" value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="例如：周先生 / 王女士" />
+              </label>
+              <label className="budget-input">
+                <span>账单标题</span>
+                <input type="text" value={billTitle} onChange={(event) => setBillTitle(event.target.value)} placeholder="例如：L60 购车金融账单" />
+              </label>
+              <label className="budget-input bill-note">
+                <span>账单备注</span>
+                <textarea value={billNote} onChange={(event) => setBillNote(event.target.value)} rows={3} placeholder="例如：给家人一起看，主要关注月供和总成本。" />
+              </label>
+            </div>
           </div>
 
           <aside className="estimate-panel finance-panel">
@@ -938,6 +1318,12 @@ export default function Home() {
             </div>
 
             <a href={currentModel.officialUrl} target="_blank" rel="noreferrer">查看乐道官网 →</a>
+            <div className="bill-actions">
+              <button type="button" onClick={saveCurrentBill}>保存到账单库</button>
+              <button type="button" onClick={() => exportCurrentBill("csv")}>导出表格 CSV</button>
+              <button type="button" onClick={() => exportCurrentBill("html")}>导出文档 HTML</button>
+            </div>
+            <p className="muted-note">保存内容会留在当前浏览器里，导出的表格和文档可直接发给家人、顾问或自己留档。</p>
           </aside>
         </div>
 
@@ -972,6 +1358,42 @@ export default function Home() {
             <p>等额本息：月供 = 本金 × 月利率 × (1 + 月利率)^期数 ÷ [(1 + 月利率)^期数 - 1]。</p>
             <p>等额本金：每月偿还固定本金，利息按剩余本金递减。免息分期：贷款本金 ÷ 分期期数。</p>
             <p>购置税估算：含税成交价先按增值税折算率还原为不含税计税价，再按所选税收口径估算。BaaS 月租作为长期月度成本单独展示。</p>
+          </section>
+        </div>
+
+        <div className="bill-library">
+          <section className="library-panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Bill library</p>
+                <h3>保存下来的账单</h3>
+              </div>
+              <p className="section-lead">每一份账单都带有人名、标题和备注，点一下就能回填继续改。</p>
+            </div>
+            {savedBills.length > 0 ? (
+              <div className="saved-bill-list">
+                {savedBills.map((item) => (
+                  <article className="saved-bill-card" key={item.id}>
+                    <div>
+                      <span>{item.snapshot.customerName}</span>
+                      <h4>{item.snapshot.billTitle}</h4>
+                      <p>
+                        {item.snapshot.currentModelName} / {item.snapshot.currentTrimName} · {item.snapshot.generatedAt}
+                      </p>
+                    </div>
+                    <p className="saved-bill-note">{item.snapshot.billNote}</p>
+                    <div className="saved-bill-actions">
+                      <button type="button" onClick={() => loadSavedBill(item)}>回填编辑</button>
+                      <button type="button" onClick={() => exportBillSnapshot(item.snapshot, "csv")}>CSV</button>
+                      <button type="button" onClick={() => exportBillSnapshot(item.snapshot, "html")}>文档</button>
+                      <button type="button" onClick={() => deleteSavedBill(item.id)}>删除</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="muted-note">还没有保存过账单。先调好参数，点“保存到账单库”试一次。</p>
+            )}
           </section>
         </div>
       </section>
