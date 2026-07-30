@@ -680,9 +680,45 @@ h3 {
   padding: 20px;
 }
 
+.finance-presets {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.finance-presets button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  text-align: left;
+}
+
+.finance-presets button span {
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.finance-presets button small {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .control-group {
   display: grid;
   gap: 12px;
+}
+
+.control-grid,
+.fee-input-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .control-label {
@@ -795,6 +831,140 @@ h3 {
   color: var(--ink);
   min-height: 48px;
   padding: 0 14px;
+}
+
+.finance-shell {
+  align-items: start;
+}
+
+.finance-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.finance-panel p {
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 0;
+}
+
+.finance-metrics {
+  display: grid;
+  gap: 10px;
+}
+
+.finance-metrics div {
+  align-items: center;
+  background: #f7f8f5;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 14px;
+}
+
+.finance-metrics span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.finance-metrics strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.repayment-chart {
+  background: #f7f8f5;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.chart-head {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chart-head strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.chart-head small {
+  color: var(--muted);
+}
+
+.chart-bars {
+  align-items: end;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  height: 120px;
+}
+
+.chart-bars span {
+  background: linear-gradient(180deg, var(--green), rgba(45, 138, 103, 0.3));
+  border-radius: 6px 6px 2px 2px;
+  min-height: 8px;
+}
+
+.cost-checklist {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.cost-checklist section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 22px;
+}
+
+.cost-checklist h3 {
+  margin-bottom: 16px;
+}
+
+.fee-list {
+  display: grid;
+  gap: 10px;
+}
+
+.fee-row {
+  align-items: start;
+  background: #f7f8f5;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+}
+
+.fee-row strong {
+  color: var(--ink);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.fee-row small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.fee-row span {
+  color: var(--ink);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.formula-card p {
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 12px;
 }
 
 .estimate-panel {
@@ -1010,7 +1180,9 @@ h3 {
   .model-grid,
   .highlight-grid,
   .experience-grid,
-  .trim-grid {
+  .trim-grid,
+  .finance-presets,
+  .cost-checklist {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1032,7 +1204,11 @@ h3 {
   .model-grid,
   .highlight-grid,
   .experience-grid,
-  .trim-grid {
+  .trim-grid,
+  .control-grid,
+  .fee-input-grid,
+  .cost-checklist,
+  .finance-presets {
     grid-template-columns: 1fr;
   }
 
@@ -1529,5 +1705,9 @@ h3 {
   .efficiency-item button {
     align-items: start;
     gap: 14px;
+  }
+
+  .chart-bars {
+    height: 100px;
   }
 }

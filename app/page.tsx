@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type ModelKey = "l60" | "l80" | "l90";
 type PurchaseMode = "vehicle" | "baas";
@@ -8,6 +8,8 @@ type ScenarioKey = "commute" | "kids" | "travel" | "parents";
 type ColumnKey = "car" | "efficiency" | "information" | "life";
 type RecordCategoryKey = "car-info" | "career-growth" | "life-efficiency" | "side-project";
 type StageKey = "plan" | "online" | "offline" | "compare" | "experience" | "budget" | "communication" | "order" | "delivery" | "ownership";
+type FinanceMode = "equal-payment" | "equal-principal" | "interest-free";
+type PurchaseTaxMode = "new-energy" | "regular";
 
 type Trim = {
   name: string;
@@ -59,6 +61,15 @@ type DailyRecord = {
   title: string;
   paragraphs: string[];
   takeaway: string;
+};
+
+type LoanQuote = {
+  monthlyRate: number;
+  monthlyPayments: number[];
+  totalPayment: number;
+  totalInterest: number;
+  firstPayment: number;
+  lastPayment: number;
 };
 
 const navItems = [
@@ -353,6 +364,31 @@ const knownOptions: KnownOption[] = [
   { id: "l60-rear-entertainment", label: "后排舒享娱乐套装", price: 10000, note: "该套装价格为 10,000 元；L60 Ultra 已标配。", models: ["l60"], excludedTrim: "Ultra" },
 ];
 
+const financePresets = [
+  {
+    label: "0 首付 / 3 年免息",
+    note: "适合模拟官方常见的短期免息方案，月供按本金平均分摊。",
+    downPaymentRate: 0,
+    termYears: 3,
+    annualRate: 0,
+    mode: "interest-free" as FinanceMode,
+  },
+  {
+    label: "20% 首付 / 7 年低息",
+    note: "适合模拟拉长期限降低月供，年化费率请填入实际审批结果。",
+    downPaymentRate: 20,
+    termYears: 7,
+    mode: "equal-payment" as FinanceMode,
+  },
+  {
+    label: "30% 首付 / 5 年标准",
+    note: "适合多数用户先看长期现金流压力，再决定是否缩短年限。",
+    downPaymentRate: 30,
+    termYears: 5,
+    mode: "equal-payment" as FinanceMode,
+  },
+];
+
 const scenarios: Record<ScenarioKey, { label: string; title: string; model: ModelKey; story: string; checklist: string[] }> = {
   commute: { label: "通勤 + 接送", title: "工作日像闹钟一样准时，车要帮你省心。", model: "l60", story: "每天固定路线上下班、接孩子、买菜，最怕停车难、补能焦虑和车机不好用。这个场景先看 L60，再判断是否需要后排娱乐套装。", checklist: ["车位尺寸", "每日通勤里程", "孩子是否常坐后排", "附近补能是否方便"] },
   kids: { label: "二孩家庭", title: "不只多一个座位，而是少很多家庭摩擦。", model: "l90", story: "两个安全座椅、老人同乘、婴儿车和书包一起上车，L90 的六座或七座布局会比纸面参数更有说服力。试驾时一定要模拟真实座位分配。", checklist: ["6 座或 7 座", "第三排进出", "安全座椅位置", "满员后备厢"] },
@@ -361,6 +397,66 @@ const scenarios: Record<ScenarioKey, { label: string; title: string; model: Mode
 };
 
 const formatPrice = (value: number) => new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", maximumFractionDigits: 0 }).format(value);
+
+const formatPercent = (value: number) => `${value.toFixed(2).replace(/\.00$/, "")}%`;
+
+function calculatePurchaseTax(grossAmount: number, taxMode: PurchaseTaxMode, vatRate: number) {
+  const vatFactor = 1 + vatRate / 100;
+  const taxableBase = grossAmount / vatFactor;
+  const taxRate = taxMode === "new-energy" ? 0.05 : 0.1;
+  const cap = taxMode === "new-energy" ? 15000 : Number.POSITIVE_INFINITY;
+  return Math.min(taxableBase * taxRate, cap);
+}
+
+function calculateLoanQuote(principal: number, annualRate: number, months: number, mode: FinanceMode): LoanQuote {
+  const safeMonths = Math.max(1, Math.round(months));
+  const monthlyRate = mode === "interest-free" ? 0 : annualRate / 100 / 12;
+
+  if (principal <= 0) {
+    return {
+      monthlyRate,
+      monthlyPayments: Array.from({ length: safeMonths }, () => 0),
+      totalPayment: 0,
+      totalInterest: 0,
+      firstPayment: 0,
+      lastPayment: 0,
+    };
+  }
+
+  if (mode === "equal-principal") {
+    const monthlyPrincipal = principal / safeMonths;
+    const monthlyPayments = Array.from({ length: safeMonths }, (_, index) => {
+      const outstanding = principal - monthlyPrincipal * index;
+      return monthlyPrincipal + outstanding * monthlyRate;
+    });
+    const totalPayment = monthlyPayments.reduce((sum, payment) => sum + payment, 0);
+    return {
+      monthlyRate,
+      monthlyPayments,
+      totalPayment,
+      totalInterest: totalPayment - principal,
+      firstPayment: monthlyPayments[0] ?? 0,
+      lastPayment: monthlyPayments[safeMonths - 1] ?? 0,
+    };
+  }
+
+  const monthlyPayment =
+    monthlyRate === 0
+      ? principal / safeMonths
+      : (principal * monthlyRate * Math.pow(1 + monthlyRate, safeMonths)) /
+        (Math.pow(1 + monthlyRate, safeMonths) - 1);
+
+  const monthlyPayments = Array.from({ length: safeMonths }, () => monthlyPayment);
+  const totalPayment = monthlyPayment * safeMonths;
+  return {
+    monthlyRate,
+    monthlyPayments,
+    totalPayment,
+    totalInterest: totalPayment - principal,
+    firstPayment: monthlyPayment,
+    lastPayment: monthlyPayment,
+  };
+}
 
 export default function Home() {
   const [selectedRecordCategory, setSelectedRecordCategory] = useState<RecordCategoryKey | "all">("all");
@@ -373,8 +469,23 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState<ModelKey>("l60");
   const [selectedTrim, setSelectedTrim] = useState("Max");
   const [purchaseMode, setPurchaseMode] = useState<PurchaseMode>("vehicle");
+  const [manualVehiclePrice, setManualVehiclePrice] = useState(202800);
+  const [financeMode, setFinanceMode] = useState<FinanceMode>("equal-payment");
+  const [purchaseTaxMode, setPurchaseTaxMode] = useState<PurchaseTaxMode>("new-energy");
+  const [downPaymentRate, setDownPaymentRate] = useState(20);
+  const [financeYears, setFinanceYears] = useState(5);
+  const [annualRate, setAnnualRate] = useState(3.5);
+  const [ownershipYears, setOwnershipYears] = useState(5);
+  const [vatRate, setVatRate] = useState(13);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [customBudget, setCustomBudget] = useState(0);
+  const [insuranceFee, setInsuranceFee] = useState(5500);
+  const [registrationFee, setRegistrationFee] = useState(800);
+  const [financeServiceFee, setFinanceServiceFee] = useState(0);
+  const [batteryRentMonthly, setBatteryRentMonthly] = useState(599);
+  const [chargingMonthly, setChargingMonthly] = useState(300);
+  const [parkingMonthly, setParkingMonthly] = useState(0);
+  const [maintenanceMonthly, setMaintenanceMonthly] = useState(0);
   const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>("commute");
 
   const filteredArticles = useMemo(() => {
@@ -401,9 +512,47 @@ export default function Home() {
   const currentTrim = currentModel.trims.find((trim) => trim.name === selectedTrim) ?? currentModel.trims[0];
   const visibleOptions = knownOptions.filter((option) => option.models.includes(selectedModel));
   const optionTotal = useMemo(() => visibleOptions.reduce((total, option) => option.excludedTrim === currentTrim.name || !selectedOptions.includes(option.id) ? total : total + option.price, 0), [currentTrim.name, selectedOptions, visibleOptions]);
-  const basePrice = purchaseMode === "vehicle" ? currentTrim.vehiclePrice : currentTrim.baasPrice;
-  const estimateTotal = basePrice + optionTotal + customBudget;
+  const basePrice = manualVehiclePrice;
   const scenario = scenarios[selectedScenario];
+  const vehicleSubtotal = basePrice + optionTotal + customBudget;
+  const purchaseTax = calculatePurchaseTax(vehicleSubtotal, purchaseTaxMode, vatRate);
+  const downPaymentAmount = (vehicleSubtotal * downPaymentRate) / 100;
+  const loanPrincipal = Math.max(0, vehicleSubtotal - downPaymentAmount);
+  const loanTermMonths = Math.max(1, Math.round(financeYears * 12));
+  const ownershipMonths = Math.max(1, Math.round(ownershipYears * 12));
+  const loanQuote = calculateLoanQuote(loanPrincipal, annualRate, loanTermMonths, financeMode);
+  const monthlyLoanPayment = loanQuote.monthlyPayments[0] ?? 0;
+  const loanPaymentsInOwnershipWindow = loanQuote.monthlyPayments.slice(0, ownershipMonths).reduce((sum, payment) => sum + payment, 0);
+  const batteryMonths = purchaseMode === "baas" ? ownershipMonths : 0;
+  const batteryRentTotal = batteryRentMonthly * batteryMonths;
+  const monthlyRunningCost = chargingMonthly + parkingMonthly + maintenanceMonthly;
+  const monthlyTotalFirstYear = monthlyLoanPayment + (purchaseMode === "baas" ? batteryRentMonthly : 0) + monthlyRunningCost;
+  const ownershipTotal =
+    downPaymentAmount +
+    loanPaymentsInOwnershipWindow +
+    purchaseTax +
+    insuranceFee +
+    registrationFee +
+    financeServiceFee +
+    batteryRentTotal +
+    monthlyRunningCost * ownershipMonths;
+  const repaymentSamples = loanQuote.monthlyPayments.slice(0, Math.min(12, loanQuote.monthlyPayments.length));
+  const repaymentChartMax = Math.max(...repaymentSamples, 1);
+  const upfrontFeeItems = [
+    { label: "车辆成交价", amount: vehicleSubtotal, note: "裸车价、官方选装和自定义配置预算" },
+    { label: "首付现金", amount: downPaymentAmount, note: `按车辆成交价的 ${formatPercent(downPaymentRate)} 估算` },
+    { label: "购置税", amount: purchaseTax, note: purchaseTaxMode === "new-energy" ? "新能源车 2026-2027 减半口径，单车减免有上限" : "普通车辆按 10% 购置税口径估算" },
+    { label: "首年保险", amount: insuranceFee, note: "交强险、商业险等，按实际报价替换" },
+    { label: "上牌登记", amount: registrationFee, note: "上牌、临牌、登记或代办费用" },
+    { label: "金融服务费", amount: financeServiceFee, note: "如方案没有该项，可保持为 0" },
+  ];
+  const monthlyFeeItems = [
+    { label: "金融月供", amount: monthlyLoanPayment, note: financeMode === "equal-principal" ? "等额本金首月最高，后续递减" : financeMode === "interest-free" ? "免息分期，本金平均摊还" : "等额本息，每月基本一致" },
+    { label: "BaaS 电池月租", amount: purchaseMode === "baas" ? batteryRentMonthly : 0, note: "仅选择租电方案时计入，按你的合同月租填写" },
+    { label: "充电 / 换电", amount: chargingMonthly, note: "按个人通勤里程和补能习惯估算" },
+    { label: "停车", amount: parkingMonthly, note: "车位、临停或单位停车费用" },
+    { label: "保养及杂费", amount: maintenanceMonthly, note: "洗车、耗材、轮胎、保养等长期支出" },
+  ];
 
   function chooseModel(modelKey: ModelKey) {
     setSelectedModel(modelKey);
@@ -412,9 +561,23 @@ export default function Home() {
     setCustomBudget(0);
   }
 
+  useEffect(() => {
+    const defaultPrice = purchaseMode === "vehicle" ? currentTrim.vehiclePrice : currentTrim.baasPrice;
+    setManualVehiclePrice(defaultPrice);
+  }, [currentTrim.baasPrice, currentTrim.vehiclePrice, purchaseMode]);
+
   function toggleOption(option: KnownOption) {
     if (option.excludedTrim === currentTrim.name) return;
     setSelectedOptions((current) => current.includes(option.id) ? current.filter((id) => id !== option.id) : [...current, option.id]);
+  }
+
+  function applyFinancePreset(preset: typeof financePresets[number]) {
+    setDownPaymentRate(preset.downPaymentRate);
+    setFinanceYears(preset.termYears);
+    setFinanceMode(preset.mode);
+    if (preset.annualRate !== undefined) {
+      setAnnualRate(preset.annualRate);
+    }
   }
 
   function chooseRecordCategory(category: RecordCategoryKey | "all") {
@@ -586,13 +749,269 @@ export default function Home() {
 
       <section className="section model-section" id="models"><div className="section-heading"><div><p className="eyebrow">ONVO buyer guide</p><h2>乐道车型，放回你的家庭生活里选择。</h2></div><p className="section-lead">车型信息和价格会持续更新，先用场景理解差别，再用计算器把预算边界算清楚。</p></div><div className="model-grid">{(Object.keys(models) as ModelKey[]).map((modelKey) => { const model = models[modelKey]; return <article className="model-card" key={model.name}><div className="model-visual"><img src={model.image} alt="" /><span>{model.visualNote}</span><strong>{model.name}</strong></div><div className="model-card-body"><span>{model.subtitle}</span><h3>{model.name}</h3><p>{model.headline}</p><div className="price-row"><strong>{formatPrice(model.trims[0].vehiclePrice)} 起</strong><small>BaaS {formatPrice(model.trims[0].baasPrice)} 起</small></div><button type="button" onClick={() => { chooseModel(modelKey); document.getElementById("calculator")?.scrollIntoView({ behavior: "smooth" }); }}>放入计算器</button></div></article> })}</div></section>
 
-      <section className="section calculator-section" id="calculator"><div className="calculator-copy"><p className="eyebrow">Price calculator</p><h2>先把预算边界算清楚，再决定试驾哪一台。</h2><p>估算按当前整理的乐道官网公开价格计算。已过期限时权益不计入总价；未披露单项价格的个性化配置，可以用自定义预算单独填写。</p></div><div className="calculator-shell"><div className="calculator-controls"><div className="control-group"><span className="control-label">车型</span><div className="segmented">{(Object.keys(models) as ModelKey[]).map((modelKey) => <button type="button" className={selectedModel === modelKey ? "active" : ""} key={modelKey} onClick={() => chooseModel(modelKey)}>{models[modelKey].name}</button>)}</div></div><div className="control-group"><span className="control-label">版本</span><div className="trim-grid">{currentModel.trims.map((trim) => <button type="button" className={currentTrim.name === trim.name ? "trim-card active" : "trim-card"} key={trim.name} onClick={() => { setSelectedTrim(trim.name); setSelectedOptions([]); }}><span>{trim.tag}</span><strong>{trim.name}</strong><small>{trim.bestFor}</small></button>)}</div></div><div className="control-group"><span className="control-label">购买方式</span><div className="segmented"><button type="button" className={purchaseMode === "vehicle" ? "active" : ""} onClick={() => setPurchaseMode("vehicle")}>整车购买</button><button type="button" className={purchaseMode === "baas" ? "active" : ""} onClick={() => setPurchaseMode("baas")}>BaaS 电池租用</button></div></div><div className="control-group"><span className="control-label">选装配置</span>{visibleOptions.length > 0 ? <div className="option-list">{visibleOptions.map((option) => { const disabled = option.excludedTrim === currentTrim.name; const selected = selectedOptions.includes(option.id) && !disabled; return <button type="button" className={selected ? "option-row active" : "option-row"} key={option.id} disabled={disabled} onClick={() => toggleOption(option)}><span><strong>{option.label}</strong><small>{disabled ? "当前版本已包含" : option.note}</small></span><b>{disabled ? "标配" : `+${formatPrice(option.price)}`}</b></button> })}</div> : <p className="muted-note">官网未公开当前可选单项的完整价格，可以把颜色、轮圈、踏板或其他个性化配置预算填在下方。</p>}<label className="budget-input"><span>自定义选装预算</span><input min="0" step="1000" type="number" value={customBudget} onChange={(event) => setCustomBudget(Math.max(0, Number(event.target.value) || 0))} /></label></div></div><aside className="estimate-panel"><span className="estimate-kicker">{currentModel.name} {currentTrim.name}</span><strong className="estimate-total">{formatPrice(estimateTotal)}</strong><dl><div><dt>基础价格</dt><dd>{formatPrice(basePrice)}</dd></div><div><dt>已选官方选装</dt><dd>{formatPrice(optionTotal)}</dd></div><div><dt>自定义选装</dt><dd>{formatPrice(customBudget)}</dd></div></dl><p>{purchaseMode === "baas" ? "BaaS 会降低购车门槛，但要结合电池租金、持有年限和换车计划再判断。" : "整车购买适合希望一次性确认资产边界、长期持有和保值预期的人。"}</p><a href={currentModel.officialUrl} target="_blank" rel="noreferrer">查看乐道官网 →</a></aside></div></section>
+      <section className="section calculator-section" id="calculator">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Price calculator</p>
+            <h2>把落地费用、金融月供和 BaaS 月租放在一张清单里。</h2>
+          </div>
+          <p className="section-lead">
+            先输入成交价和金融条件，再看首付、税费、月供、租电和长期用车成本。这里是估算工具，最终以门店报价、金融审批和合同为准。
+          </p>
+        </div>
+
+        <div className="finance-presets" aria-label="金融方案快捷填入">
+          {financePresets.map((preset) => (
+            <button type="button" key={preset.label} onClick={() => applyFinancePreset(preset)}>
+              <span>{preset.label}</span>
+              <small>{preset.note}</small>
+            </button>
+          ))}
+        </div>
+
+        <div className="calculator-shell finance-shell">
+          <div className="calculator-controls">
+            <div className="control-group">
+              <span className="control-label">车型</span>
+              <div className="segmented">
+                {(Object.keys(models) as ModelKey[]).map((modelKey) => (
+                  <button type="button" className={selectedModel === modelKey ? "active" : ""} key={modelKey} onClick={() => chooseModel(modelKey)}>
+                    {models[modelKey].name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="control-group">
+              <span className="control-label">版本</span>
+              <div className="trim-grid">
+                {currentModel.trims.map((trim) => (
+                  <button
+                    type="button"
+                    className={currentTrim.name === trim.name ? "trim-card active" : "trim-card"}
+                    key={trim.name}
+                    onClick={() => {
+                      setSelectedTrim(trim.name);
+                      setSelectedOptions([]);
+                    }}
+                  >
+                    <span>{trim.tag}</span>
+                    <strong>{trim.name}</strong>
+                    <small>{purchaseMode === "vehicle" ? formatPrice(trim.vehiclePrice) : `BaaS ${formatPrice(trim.baasPrice)}`}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="control-grid">
+              <label className="budget-input">
+                <span>车辆成交价 / BaaS 车价</span>
+                <input min="0" step="1000" type="number" value={manualVehiclePrice} onChange={(event) => setManualVehiclePrice(Math.max(0, Number(event.target.value) || 0))} />
+              </label>
+              <label className="budget-input">
+                <span>自定义选装预算</span>
+                <input min="0" step="1000" type="number" value={customBudget} onChange={(event) => setCustomBudget(Math.max(0, Number(event.target.value) || 0))} />
+              </label>
+              <label className="budget-input">
+                <span>首付比例</span>
+                <input min="0" max="100" step="5" type="number" value={downPaymentRate} onChange={(event) => setDownPaymentRate(Math.min(100, Math.max(0, Number(event.target.value) || 0)))} />
+              </label>
+              <label className="budget-input">
+                <span>分期年限</span>
+                <input min="1" max="8" step="1" type="number" value={financeYears} onChange={(event) => setFinanceYears(Math.min(8, Math.max(1, Number(event.target.value) || 1)))} />
+              </label>
+              <label className="budget-input">
+                <span>年化费率</span>
+                <input min="0" max="24" step="0.1" type="number" value={annualRate} onChange={(event) => setAnnualRate(Math.min(24, Math.max(0, Number(event.target.value) || 0)))} />
+              </label>
+              <label className="budget-input">
+                <span>BaaS 电池月租</span>
+                <input min="0" step="50" type="number" value={batteryRentMonthly} onChange={(event) => setBatteryRentMonthly(Math.max(0, Number(event.target.value) || 0))} />
+              </label>
+              <label className="budget-input">
+                <span>持有年限</span>
+                <input min="1" max="10" step="1" type="number" value={ownershipYears} onChange={(event) => setOwnershipYears(Math.min(10, Math.max(1, Number(event.target.value) || 1)))} />
+              </label>
+              <label className="budget-input">
+                <span>增值税折算率</span>
+                <input min="0" max="20" step="0.5" type="number" value={vatRate} onChange={(event) => setVatRate(Math.min(20, Math.max(0, Number(event.target.value) || 0)))} />
+              </label>
+            </div>
+
+            <div className="control-group">
+              <span className="control-label">购买方式</span>
+              <div className="segmented">
+                <button type="button" className={purchaseMode === "vehicle" ? "active" : ""} onClick={() => setPurchaseMode("vehicle")}>整车购买</button>
+                <button type="button" className={purchaseMode === "baas" ? "active" : ""} onClick={() => setPurchaseMode("baas")}>BaaS 电池租用</button>
+              </div>
+            </div>
+
+            <div className="control-group">
+              <span className="control-label">金融方案</span>
+              <div className="segmented">
+                <button type="button" className={financeMode === "equal-payment" ? "active" : ""} onClick={() => setFinanceMode("equal-payment")}>等额本息</button>
+                <button type="button" className={financeMode === "equal-principal" ? "active" : ""} onClick={() => setFinanceMode("equal-principal")}>等额本金</button>
+                <button type="button" className={financeMode === "interest-free" ? "active" : ""} onClick={() => { setFinanceMode("interest-free"); setAnnualRate(0); }}>免息分期</button>
+              </div>
+            </div>
+
+            <div className="control-group">
+              <span className="control-label">购置税口径</span>
+              <div className="segmented">
+                <button type="button" className={purchaseTaxMode === "new-energy" ? "active" : ""} onClick={() => setPurchaseTaxMode("new-energy")}>新能源减半</button>
+                <button type="button" className={purchaseTaxMode === "regular" ? "active" : ""} onClick={() => setPurchaseTaxMode("regular")}>普通车辆 10%</button>
+              </div>
+            </div>
+
+            <div className="control-group">
+              <span className="control-label">官方选装配置</span>
+              {visibleOptions.length > 0 ? (
+                <div className="option-list">
+                  {visibleOptions.map((option) => {
+                    const disabled = option.excludedTrim === currentTrim.name;
+                    const selected = selectedOptions.includes(option.id) && !disabled;
+                    return (
+                      <button type="button" className={selected ? "option-row active" : "option-row"} key={option.id} disabled={disabled} onClick={() => toggleOption(option)}>
+                        <span><strong>{option.label}</strong><small>{disabled ? "当前版本已包含" : option.note}</small></span>
+                        <b>{disabled ? "标配" : `+${formatPrice(option.price)}`}</b>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="muted-note">当前车型没有录入官方单项选装价格，可在自定义选装预算里单独填写。</p>
+              )}
+            </div>
+
+            <div className="fee-input-grid">
+              <label className="budget-input">
+                <span>首年保险</span>
+                <input min="0" step="100" type="number" value={insuranceFee} onChange={(event) => setInsuranceFee(Math.max(0, Number(event.target.value) || 0))} />
+              </label>
+              <label className="budget-input">
+                <span>上牌登记</span>
+                <input min="0" step="100" type="number" value={registrationFee} onChange={(event) => setRegistrationFee(Math.max(0, Number(event.target.value) || 0))} />
+              </label>
+              <label className="budget-input">
+                <span>金融服务费</span>
+                <input min="0" step="100" type="number" value={financeServiceFee} onChange={(event) => setFinanceServiceFee(Math.max(0, Number(event.target.value) || 0))} />
+              </label>
+              <label className="budget-input">
+                <span>月充电 / 换电</span>
+                <input min="0" step="50" type="number" value={chargingMonthly} onChange={(event) => setChargingMonthly(Math.max(0, Number(event.target.value) || 0))} />
+              </label>
+              <label className="budget-input">
+                <span>月停车</span>
+                <input min="0" step="50" type="number" value={parkingMonthly} onChange={(event) => setParkingMonthly(Math.max(0, Number(event.target.value) || 0))} />
+              </label>
+              <label className="budget-input">
+                <span>月保养及杂费</span>
+                <input min="0" step="50" type="number" value={maintenanceMonthly} onChange={(event) => setMaintenanceMonthly(Math.max(0, Number(event.target.value) || 0))} />
+              </label>
+            </div>
+          </div>
+
+          <aside className="estimate-panel finance-panel">
+            <span className="estimate-kicker">{currentModel.name} {currentTrim.name} · {purchaseMode === "baas" ? "BaaS 租电" : "整车购买"}</span>
+            <strong className="estimate-total">{formatPrice(monthlyTotalFirstYear)}</strong>
+            <p>首月综合支出估算：金融月供 + BaaS 月租 + 充电 / 停车 / 保养等月度预算。</p>
+
+            <div className="finance-metrics">
+              <div><span>车辆小计</span><strong>{formatPrice(vehicleSubtotal)}</strong></div>
+              <div><span>首付现金</span><strong>{formatPrice(downPaymentAmount)}</strong></div>
+              <div><span>贷款本金</span><strong>{formatPrice(loanPrincipal)}</strong></div>
+              <div><span>{financeMode === "equal-principal" ? "首月月供" : "月供"}</span><strong>{formatPrice(monthlyLoanPayment)}</strong></div>
+              <div><span>总利息</span><strong>{formatPrice(loanQuote.totalInterest)}</strong></div>
+              <div><span>{ownershipYears} 年总成本</span><strong>{formatPrice(ownershipTotal)}</strong></div>
+            </div>
+
+            <div className="repayment-chart" aria-label="前 12 个月还款趋势">
+              <div className="chart-head">
+                <strong>前 12 个月月供趋势</strong>
+                <small>{financeMode === "equal-principal" ? `末月 ${formatPrice(loanQuote.lastPayment)}` : `${financeYears} 年共 ${loanTermMonths} 期`}</small>
+              </div>
+              <div className="chart-bars">
+                {repaymentSamples.map((payment, index) => (
+                  <span key={`${payment}-${index}`} style={{ height: `${Math.max(8, (payment / repaymentChartMax) * 100)}%` }} title={`第 ${index + 1} 个月：${formatPrice(payment)}`} />
+                ))}
+              </div>
+            </div>
+
+            <a href={currentModel.officialUrl} target="_blank" rel="noreferrer">查看乐道官网 →</a>
+          </aside>
+        </div>
+
+        <div className="cost-checklist">
+          <section>
+            <p className="eyebrow">Upfront cost</p>
+            <h3>一次性落地清单</h3>
+            <div className="fee-list">
+              {upfrontFeeItems.map((item) => (
+                <div className="fee-row" key={item.label}>
+                  <div><strong>{item.label}</strong><small>{item.note}</small></div>
+                  <span>{formatPrice(item.amount)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section>
+            <p className="eyebrow">Monthly cost</p>
+            <h3>每月使用清单</h3>
+            <div className="fee-list">
+              {monthlyFeeItems.map((item) => (
+                <div className="fee-row" key={item.label}>
+                  <div><strong>{item.label}</strong><small>{item.note}</small></div>
+                  <span>{formatPrice(item.amount)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="formula-card">
+            <p className="eyebrow">Formula</p>
+            <h3>计算口径</h3>
+            <p>等额本息：月供 = 本金 × 月利率 × (1 + 月利率)^期数 ÷ [(1 + 月利率)^期数 - 1]。</p>
+            <p>等额本金：每月偿还固定本金，利息按剩余本金递减。免息分期：贷款本金 ÷ 分期期数。</p>
+            <p>购置税估算：含税成交价先按增值税折算率还原为不含税计税价，再按所选税收口径估算。BaaS 月租作为长期月度成本单独展示。</p>
+          </section>
+        </div>
+      </section>
 
       <section className="section scenario-section" id="scenarios"><div className="section-heading"><div><p className="eyebrow">Lifestyle match</p><h2>按家庭和生活方式，而不是按参数表开始。</h2></div></div><div className="scenario-layout"><div className="scenario-tabs">{(Object.keys(scenarios) as ScenarioKey[]).map((key) => <button type="button" className={selectedScenario === key ? "active" : ""} key={key} onClick={() => { setSelectedScenario(key); chooseModel(scenarios[key].model); }}>{scenarios[key].label}</button>)}</div><article className="scenario-story"><span>推荐重点看 {models[scenario.model].name}</span><h3>{scenario.title}</h3><p>{scenario.story}</p><ul>{scenario.checklist.map((item) => <li key={item}>{item}</li>)}</ul></article></div></section>
 
       <section className="section highlights-section" id="highlights"><div className="section-heading"><div><p className="eyebrow">Model highlights</p><h2>车型亮点要讲成家人能听懂的话。</h2></div></div><div className="highlight-grid">{(Object.keys(models) as ModelKey[]).map((modelKey) => <article className="highlight-card" key={modelKey}><span>{models[modelKey].name}</span><h3>{models[modelKey].lifestyle}</h3><ul>{models[modelKey].highlights.map((item) => <li key={item}>{item}</li>)}</ul><p>{models[modelKey].advisorNote}</p></article>)}</div></section>
 
-      <section className="section source-section"><div><p className="eyebrow">Sources</p><h2>价格和车型信息从官网来，判断从真实生活来。</h2></div><ul>{(Object.keys(models) as ModelKey[]).map((modelKey) => <li key={modelKey}><a href={models[modelKey].officialUrl} target="_blank" rel="noreferrer">{models[modelKey].name}</a><span>{models[modelKey].sourceLabel}</span></li>)}<li><a href="https://www.onvo.cn/news" target="_blank" rel="noreferrer">乐道官网新闻</a><span>用于核对上市、价格、权益和车型定位。</span></li></ul></section>
+      <section className="section source-section">
+        <div>
+          <p className="eyebrow">Sources</p>
+          <h2>价格、税费和金融口径都尽量从官方来。</h2>
+        </div>
+        <ul>
+          {(Object.keys(models) as ModelKey[]).map((modelKey) => (
+            <li key={modelKey}>
+              <a href={models[modelKey].officialUrl} target="_blank" rel="noreferrer">
+                {models[modelKey].name}
+              </a>
+              <span>{models[modelKey].sourceLabel}</span>
+            </li>
+          ))}
+          <li>
+            <a href="https://www.onvo.cn/news" target="_blank" rel="noreferrer">乐道官网新闻</a>
+            <span>用于核对上市、价格、权益和车型定位。</span>
+          </li>
+          <li>
+            <a href="https://hq.mof.gov.cn/tongzhitonggao/202307/t20230704_3894319.htm" target="_blank" rel="noreferrer">新能源车购置税政策</a>
+            <span>2026-2027 年新能源乘用车减半征收购置税，每辆减税额不超过 1.5 万元。</span>
+          </li>
+          <li>
+            <a href="https://www.bankofchina.com/pbservice/pb2/200806/t20080625_714_76.htm" target="_blank" rel="noreferrer">汽车贷款还款方式</a>
+            <span>等额本息、等额本金等还款方式的常见银行口径参考。</span>
+          </li>
+          <li>
+            <a href="https://www.onvo.cn/testimonials/20250211012" target="_blank" rel="noreferrer">乐道 BaaS 月租参考</a>
+            <span>官方社区内容中提到 60 度 599 元/月、85 度 899 元/月的租电参考。</span>
+          </li>
+        </ul>
+      </section>
 
       <section className="contact-section" id="contact"><div><p className="eyebrow">Contact</p><h2>想看车、试驾，或者想把一个生活问题聊清楚，可以从这里开始。</h2></div><div className="contact-methods">{contactMethods.map((method) => <a className="contact-method" href={method.href} key={method.label} target={method.label === "小红书号" ? "_blank" : undefined} rel={method.label === "小红书号" ? "noreferrer" : undefined}><span>{method.label}</span><strong>{method.value}</strong></a>)}</div></section>
     </main>
