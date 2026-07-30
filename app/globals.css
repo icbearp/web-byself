@@ -305,16 +305,109 @@ h3 {
 .daily-layout {
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(0, 0.86fr) minmax(360px, 1.14fr);
+  grid-template-columns: minmax(220px, 0.52fr) minmax(0, 0.95fr) minmax(320px, 0.88fr);
+  margin-top: 18px;
 }
 
 .daily-entry,
+.record-browser,
 .timeline-card,
 .delivery-card {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: 0 14px 38px rgba(15, 42, 36, 0.08);
+}
+
+.record-collections {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.collection-card {
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  display: grid;
+  gap: 10px;
+  min-height: 190px;
+  padding: 18px;
+  text-align: left;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.collection-card:hover,
+.collection-card.active {
+  border-color: rgba(45, 138, 103, 0.48);
+  box-shadow: 0 14px 34px rgba(15, 42, 36, 0.09);
+  transform: translateY(-2px);
+}
+
+.collection-card span {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.collection-card strong {
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.collection-card p {
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.record-browser {
+  align-self: start;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  position: sticky;
+  top: 96px;
+}
+
+.browser-head h3 {
+  font-size: 24px;
+  margin-bottom: 0;
+}
+
+.record-date-list {
+  display: grid;
+  gap: 10px;
+}
+
+.record-date {
+  background: #f7f8f5;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: inherit;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  text-align: left;
+}
+
+.record-date.active {
+  background: #edf5ef;
+  border-color: rgba(45, 138, 103, 0.42);
+}
+
+.record-date span,
+.record-date small {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.record-date strong {
+  color: var(--ink);
+  line-height: 1.35;
 }
 
 .daily-entry {
@@ -344,6 +437,23 @@ h3 {
 .daily-entry h3 {
   font-size: clamp(28px, 4vw, 42px);
   margin-bottom: 0;
+}
+
+.record-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.record-tags button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 0 12px;
 }
 
 .daily-entry p,
@@ -384,6 +494,13 @@ h3 {
   padding: clamp(22px, 4vw, 34px);
 }
 
+.timeline-head {
+  align-items: start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
 .timeline-card h3,
 .delivery-card h3 {
   font-size: clamp(26px, 4vw, 40px);
@@ -398,11 +515,20 @@ h3 {
 }
 
 .journey-list li {
+  padding: 0 0 22px;
+  position: relative;
+}
+
+.journey-list button {
+  background: transparent;
+  border: 0;
+  color: inherit;
   display: grid;
   gap: 14px;
   grid-template-columns: 46px minmax(0, 1fr);
-  padding: 0 0 22px;
-  position: relative;
+  padding: 0;
+  text-align: left;
+  width: 100%;
 }
 
 .journey-list li:not(:last-child)::after {
@@ -413,6 +539,11 @@ h3 {
   position: absolute;
   top: 42px;
   width: 1px;
+}
+
+.journey-list li.active span,
+.journey-list button:hover span {
+  background: var(--green);
 }
 
 .journey-list span {
@@ -441,6 +572,12 @@ h3 {
   color: var(--muted);
   line-height: 1.7;
   margin: 0;
+}
+
+.collection-note {
+  color: var(--muted);
+  line-height: 1.8;
+  margin: 18px 0 0;
 }
 
 .delivery-card ul {
@@ -865,6 +1002,7 @@ h3 {
   }
 
   .daily-entry,
+  .record-browser,
   .estimate-panel {
     position: static;
   }
@@ -873,6 +1011,10 @@ h3 {
   .highlight-grid,
   .experience-grid,
   .trim-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .record-collections {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -892,6 +1034,18 @@ h3 {
   .experience-grid,
   .trim-grid {
     grid-template-columns: 1fr;
+  }
+
+  .record-collections {
+    grid-template-columns: 1fr;
+  }
+
+  .collection-card {
+    min-height: auto;
+  }
+
+  .timeline-head {
+    display: block;
   }
 
   .section-heading,

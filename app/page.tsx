@@ -6,6 +6,8 @@ type ModelKey = "l60" | "l80" | "l90";
 type PurchaseMode = "vehicle" | "baas";
 type ScenarioKey = "commute" | "kids" | "travel" | "parents";
 type ColumnKey = "car" | "efficiency" | "information" | "life";
+type RecordCategoryKey = "car-info" | "career-growth" | "life-efficiency" | "side-project";
+type StageKey = "plan" | "online" | "offline" | "compare" | "experience" | "budget" | "communication" | "order" | "delivery" | "ownership";
 
 type Trim = {
   name: string;
@@ -48,6 +50,17 @@ type EfficiencyNote = {
   steps: string[];
 };
 
+type DailyRecord = {
+  id: string;
+  date: string;
+  category: RecordCategoryKey;
+  stage?: StageKey;
+  tags: string[];
+  title: string;
+  paragraphs: string[];
+  takeaway: string;
+};
+
 const navItems = [
   { label: "关于我", href: "#about" },
   { label: "每日记录", href: "#daily-record" },
@@ -83,10 +96,58 @@ const contactMethods = [
   },
 ];
 
-const dailyRecords = [
+const recordCollections: Array<{
+  key: RecordCategoryKey;
+  label: string;
+  title: string;
+  intro: string;
+}> = [
   {
+    key: "car-info",
+    label: "购车资讯相关",
+    title: "把选车、看车、用车讲成普通人能决策的语言",
+    intro: "记录买车阶段、车型判断、补能体验、门店沟通和交付后的长期服务，重点是帮用户少走弯路。",
+  },
+  {
+    key: "career-growth",
+    label: "职场成长",
+    title: "把销售、沟通和长期信任做成可复用的方法",
+    intro: "沉淀顾问式销售、用户关系、表达方式、复盘习惯和个人成长，服务自己的职业积累。",
+  },
+  {
+    key: "life-efficiency",
+    label: "生活效率",
+    title: "让工具真正减少重复消耗",
+    intro: "分享 AI、信息整理、资料检索、自动化和日常工作流，让效率工具变成可落地的生活能力。",
+  },
+  {
+    key: "side-project",
+    label: "锦上添花的业余",
+    title: "把兴趣、体验和生活质感慢慢放进来",
+    intro: "记录不一定立刻变现、但能让生活更丰富的内容，比如阅读、旅行、审美、业余项目和灵感收藏。",
+  },
+];
+
+const dailyRecords: DailyRecord[] = [
+  {
+    id: "2026-07-29-content-collections",
+    date: "2026-07-29",
+    category: "career-growth",
+    tags: ["#网站整理", "#内容集合", "#长期积累"],
+    title: "内容不是越堆越多，而是要慢慢长成清晰的集合",
+    paragraphs: [
+      "今天重新看这个独立站，我意识到每日记录不能只是往下堆。前两篇记录一多，页面就会变长；以后如果持续更新几十篇、上百篇，访客反而更难找到真正需要的内容。",
+      "所以网站需要从“流水账”变成“内容集合”：按日期能回看当天记录，按话题能看同一类经验，按买车阶段能直接进入当前最相关的问题。这样首页保持简洁，但内容不会被折叠到没人看见。",
+      "这件事也很像做用户服务。用户不需要我把所有信息一次性倒给他，而是需要在合适的阶段看到合适的内容。好的整理，本质上是在降低对方理解和决策的成本。",
+    ],
+    takeaway: "长期内容要有分类、有路径、有入口；不是让页面显得很多，而是让用户更快找到对自己有用的那一篇。",
+  },
+  {
+    id: "2026-07-24-first-car-stage",
     date: "2026-07-24",
-    tag: "#买车的初阶段",
+    category: "car-info",
+    stage: "plan",
+    tags: ["#买车的初阶段", "#试驾邀约", "#服务心态"],
     title: "把门店邀约当成服务，而不是催促",
     paragraphs: [
       "其实，只要最近开始了解车，很多车企都会频繁打电话、邀约试驾，后续跟进也会很多。对一些人来说，这会特别反感；但如果把它看成一种服务和出行体验，感受就会完全不一样。",
@@ -96,8 +157,11 @@ const dailyRecords = [
     takeaway: "把买车当成一次需要认真完成的决策，而不是一次被动催促的消费。",
   },
   {
+    id: "2026-07-26-ev-long-term-value",
     date: "2026-07-26",
-    tag: "#电动车用车判断",
+    category: "car-info",
+    stage: "ownership",
+    tags: ["#电动车用车判断", "#换电", "#长期体验"],
     title: "电动车的价值，不只是续航，而是未来的长期使用体验",
     paragraphs: [
       "今天重新梳理自己对电动车的判断：真正值得关注的，不是短期内的续航数字，而是未来几年里，它能不能持续提供稳定、低成本、可升级的使用体验。",
@@ -109,17 +173,17 @@ const dailyRecords = [
   },
 ];
 
-const purchaseStages = [
-  { step: "01", title: "初买车打算", note: "先确认自己为什么要买车，是否真的需要换车或新增一台。" },
-  { step: "02", title: "网上了解", note: "看官网、口碑、测评和政策，先建立基础认知。" },
-  { step: "03", title: "线下了解", note: "进店看实车、摸材质、问清服务和交付流程。" },
-  { step: "04", title: "对比", note: "横向看竞品，把价格、空间、补能和权益放在一起。" },
-  { step: "05", title: "体验", note: "试驾、试乘和后排体验，感受它是否真的适合家人。" },
-  { step: "06", title: "预算", note: "整车、BaaS、保险、补能和停车一起算总账。" },
-  { step: "07", title: "沟通", note: "和顾问确认权益、交期、服务和可能的疑问。" },
-  { step: "08", title: "订车", note: "确定版本、颜色和交付节奏，完成下定。" },
-  { step: "09", title: "交付", note: "验车、提车、熟悉功能，把车真正接回家。" },
-  { step: "10", title: "交付后的生命周期服务", note: "补能、售后、升级、社区和用车问题处理，才是长期体验的开始。" },
+const purchaseStages: Array<{ key: StageKey; step: string; title: string; note: string }> = [
+  { key: "plan", step: "01", title: "初买车打算", note: "先确认自己为什么要买车，是否真的需要换车或新增一台。" },
+  { key: "online", step: "02", title: "网上了解", note: "看官网、口碑、测评和政策，先建立基础认知。" },
+  { key: "offline", step: "03", title: "线下了解", note: "进店看实车、摸材质、问清服务和交付流程。" },
+  { key: "compare", step: "04", title: "对比", note: "横向看竞品，把价格、空间、补能和权益放在一起。" },
+  { key: "experience", step: "05", title: "体验", note: "试驾、试乘和后排体验，感受它是否真的适合家人。" },
+  { key: "budget", step: "06", title: "预算", note: "整车、BaaS、保险、补能和停车一起算总账。" },
+  { key: "communication", step: "07", title: "沟通", note: "和顾问确认权益、交期、服务和可能的疑问。" },
+  { key: "order", step: "08", title: "订车", note: "确定版本、颜色和交付节奏，完成下定。" },
+  { key: "delivery", step: "09", title: "交付", note: "验车、提车、熟悉功能，把车真正接回家。" },
+  { key: "ownership", step: "10", title: "交付后的生命周期服务", note: "补能、售后、升级、社区和用车问题处理，才是长期体验的开始。" },
 ];
 
 const deliveryServices = [
@@ -299,6 +363,9 @@ const scenarios: Record<ScenarioKey, { label: string; title: string; model: Mode
 const formatPrice = (value: number) => new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", maximumFractionDigits: 0 }).format(value);
 
 export default function Home() {
+  const [selectedRecordCategory, setSelectedRecordCategory] = useState<RecordCategoryKey | "all">("all");
+  const [selectedStage, setSelectedStage] = useState<StageKey | "all">("all");
+  const [selectedDailyId, setSelectedDailyId] = useState("2026-07-29-content-collections");
   const [selectedColumn, setSelectedColumn] = useState<ColumnKey | "all">("all");
   const [articleQuery, setArticleQuery] = useState("");
   const [expandedArticle, setExpandedArticle] = useState<string | null>("car-fit");
@@ -319,6 +386,17 @@ export default function Home() {
     });
   }, [articleQuery, selectedColumn]);
 
+  const filteredDailyRecords = useMemo(() => {
+    return dailyRecords.filter((record) => {
+      const matchesCategory = selectedRecordCategory === "all" || record.category === selectedRecordCategory;
+      const matchesStage = selectedStage === "all" || record.stage === selectedStage;
+      return matchesCategory && matchesStage;
+    });
+  }, [selectedRecordCategory, selectedStage]);
+
+  const selectedDailyRecord = filteredDailyRecords.find((record) => record.id === selectedDailyId) ?? filteredDailyRecords[0] ?? dailyRecords[0];
+  const activeCollection = selectedRecordCategory === "all" ? null : recordCollections.find((collection) => collection.key === selectedRecordCategory);
+
   const currentModel = models[selectedModel];
   const currentTrim = currentModel.trims.find((trim) => trim.name === selectedTrim) ?? currentModel.trims[0];
   const visibleOptions = knownOptions.filter((option) => option.models.includes(selectedModel));
@@ -337,6 +415,20 @@ export default function Home() {
   function toggleOption(option: KnownOption) {
     if (option.excludedTrim === currentTrim.name) return;
     setSelectedOptions((current) => current.includes(option.id) ? current.filter((id) => id !== option.id) : [...current, option.id]);
+  }
+
+  function chooseRecordCategory(category: RecordCategoryKey | "all") {
+    setSelectedRecordCategory(category);
+    setSelectedStage("all");
+    const nextRecord = dailyRecords.find((record) => category === "all" || record.category === category);
+    if (nextRecord) setSelectedDailyId(nextRecord.id);
+  }
+
+  function chooseStage(stage: StageKey | "all") {
+    setSelectedStage(stage);
+    setSelectedRecordCategory("car-info");
+    const nextRecord = dailyRecords.find((record) => stage === "all" ? record.category === "car-info" : record.stage === stage);
+    if (nextRecord) setSelectedDailyId(nextRecord.id);
   }
 
   return (
@@ -371,38 +463,79 @@ export default function Home() {
           <p className="section-lead">日期、标签、观点和购车阶段，一次整理清楚，后面就能持续积累。</p>
         </div>
 
+        <div className="record-collections" aria-label="每日记录集合分类">
+          <button type="button" className={selectedRecordCategory === "all" ? "collection-card active" : "collection-card"} onClick={() => chooseRecordCategory("all")}>
+            <span>全部记录</span>
+            <strong>按日期回看所有沉淀</strong>
+            <p>保留完整时间线，方便快速找到最近写过的内容。</p>
+          </button>
+          {recordCollections.map((collection) => (
+            <button type="button" className={selectedRecordCategory === collection.key ? "collection-card active" : "collection-card"} key={collection.key} onClick={() => chooseRecordCategory(collection.key)}>
+              <span>{collection.label}</span>
+              <strong>{collection.title}</strong>
+              <p>{collection.intro}</p>
+            </button>
+          ))}
+        </div>
+
         <div className="daily-layout">
-          <div className="daily-entry-list">
-            {dailyRecords.map((entry) => (
-              <article className="daily-entry" key={entry.date}>
-                <div className="daily-meta">
+          <aside className="record-browser" aria-label="按日期选择每日记录">
+            <div className="browser-head">
+              <p className="eyebrow">Records</p>
+              <h3>按日期阅读</h3>
+            </div>
+            <div className="record-date-list">
+              {filteredDailyRecords.map((entry) => (
+                <button type="button" className={selectedDailyRecord.id === entry.id ? "record-date active" : "record-date"} key={entry.id} onClick={() => setSelectedDailyId(entry.id)}>
                   <span>{entry.date}</span>
-                  <span>{entry.tag}</span>
-                </div>
-                <h3>{entry.title}</h3>
-                {entry.paragraphs.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-                <div className="daily-takeaway">
-                  <span>记录结论</span>
-                  <strong>{entry.takeaway}</strong>
-                </div>
-              </article>
+                  <strong>{entry.title}</strong>
+                  <small>{recordCollections.find((collection) => collection.key === entry.category)?.label}</small>
+                </button>
+              ))}
+            </div>
+            {filteredDailyRecords.length === 0 && <p className="empty-state">这个分类暂时还没有记录，先换一个集合看看。</p>}
+          </aside>
+
+          <article className="daily-entry" key={selectedDailyRecord.id}>
+            <div className="daily-meta">
+              <span>{selectedDailyRecord.date}</span>
+              <span>{recordCollections.find((collection) => collection.key === selectedDailyRecord.category)?.label}</span>
+              {selectedDailyRecord.stage && <span>{purchaseStages.find((stage) => stage.key === selectedDailyRecord.stage)?.title}</span>}
+            </div>
+            <h3>{selectedDailyRecord.title}</h3>
+            <div className="record-tags">
+              {selectedDailyRecord.tags.map((tag) => (
+                <button type="button" key={tag} onClick={() => setSelectedDailyId(selectedDailyRecord.id)}>{tag}</button>
+              ))}
+            </div>
+            {selectedDailyRecord.paragraphs.map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
             ))}
-          </div>
+            <div className="daily-takeaway">
+              <span>记录结论</span>
+              <strong>{selectedDailyRecord.takeaway}</strong>
+            </div>
+          </article>
 
           <div className="daily-sidebar">
             <section className="timeline-card" id="journey">
-              <p className="eyebrow">Buyer's journey</p>
-              <h3>买车阶段时间线</h3>
+              <div className="timeline-head">
+                <div>
+                  <p className="eyebrow">Buyer's journey</p>
+                  <h3>买车阶段时间线</h3>
+                </div>
+                <button type="button" className={selectedStage === "all" ? "filter-chip active" : "filter-chip"} onClick={() => chooseStage("all")}>全部阶段</button>
+              </div>
               <ol className="journey-list">
                 {purchaseStages.map((item) => (
-                  <li key={item.step}>
-                    <span>{item.step}</span>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <p>{item.note}</p>
-                    </div>
+                  <li key={item.step} className={selectedStage === item.key ? "active" : ""}>
+                    <button type="button" onClick={() => chooseStage(item.key)} aria-label={`查看${item.title}阶段的记录`}>
+                      <span>{item.step}</span>
+                      <div>
+                        <strong>{item.title}</strong>
+                        <p>{item.note}</p>
+                      </div>
+                    </button>
                   </li>
                 ))}
               </ol>
@@ -423,6 +556,7 @@ export default function Home() {
             </section>
           </div>
         </div>
+        {activeCollection && <p className="collection-note">当前集合：{activeCollection.label}。{activeCollection.intro}</p>}
       </section>
 
       <section className="section profile-section" id="about">
