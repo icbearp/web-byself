@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { calculateAnnualizedIrr } from "./finance-math";
 
 type ModelKey = "l60" | "l80" | "l90";
 type PurchaseMode = "vehicle" | "baas";
@@ -622,40 +623,6 @@ function calculateNioFiveYearQuote(principal: number): LoanQuote {
   };
 }
 
-function calculateAnnualizedIrr(cashFlows: number[]): number | null {
-  if (cashFlows.length < 2 || !cashFlows.some((value) => value > 0) || !cashFlows.some((value) => value < 0)) return null;
-
-  const netPresentValue = (monthlyRate: number) =>
-    cashFlows.reduce((total, cashFlow, index) => total + cashFlow / Math.pow(1 + monthlyRate, index), 0);
-
-  let lower = -0.999999;
-  let upper = 1;
-  let lowerValue = netPresentValue(lower);
-  let upperValue = netPresentValue(upper);
-
-  while (lowerValue * upperValue > 0 && upper < 128) {
-    upper *= 2;
-    upperValue = netPresentValue(upper);
-  }
-
-  if (lowerValue * upperValue > 0) return null;
-
-  let midpoint = 0;
-  for (let iteration = 0; iteration < 100; iteration += 1) {
-    midpoint = (lower + upper) / 2;
-    const midpointValue = netPresentValue(midpoint);
-    if (Math.abs(midpointValue) < 0.000001) break;
-    if (lowerValue * midpointValue <= 0) {
-      upper = midpoint;
-    } else {
-      lower = midpoint;
-      lowerValue = midpointValue;
-    }
-  }
-
-  return (Math.pow(1 + midpoint, 12) - 1) * 100;
-}
-
 const BILL_STORAGE_KEY = "zhouduofu-finance-bills-v2";
 
 function escapeHtml(value: string) {
@@ -704,7 +671,7 @@ function buildCsv(snapshot: FinanceBillSnapshot) {
     ["汇总", "首月综合支出", String(Math.round(snapshot.monthlyTotalFirstYear)), "月供 + 月租 + 运行成本"],
     ["汇总", "贷款本金", String(Math.round(snapshot.loanPrincipal)), "扣除首付后的贷款金额"],
     ["汇总", "总利息", String(Math.round(snapshot.loanQuote.totalInterest)), "仅供估算"],
-    ["汇总", "综合年化成本（IRR）", formatIrr(snapshot.loanIrrPercent), "按实际放款与每期还款现金流估算，用于横向比较"],
+    ["汇总", "综合年化融资成本（IRR）", formatIrr(snapshot.loanIrrPercent), "含用户填写的金融服务费，按实际现金流估算"],
     ["汇总", "提前结清参考", String(Math.round(snapshot.earlyPayoffEligibleMonth > 0 ? snapshot.earlyPayoffAmount : snapshot.payoffAtOwnership)), snapshot.earlyPayoffEligibleMonth > 0 ? `满 ${snapshot.earlyPayoffEligibleMonth} 期后可申请` : "按持有期估算"],
     ["汇总", `${snapshot.ownershipYears} 年总成本`, String(Math.round(snapshot.ownershipTotal)), "首付 + 月供 + 税费 + 月度支出"],
   ];
@@ -799,7 +766,7 @@ function buildBillDocument(snapshot: FinanceBillSnapshot) {
         <div class="metric"><span>首月综合支出</span><strong>${formatPrice(snapshot.monthlyTotalFirstYear)}</strong></div>
         <div class="metric"><span>贷款本金</span><strong>${formatPrice(snapshot.loanPrincipal)}</strong></div>
         <div class="metric"><span>首付现金</span><strong>${formatPrice(snapshot.downPaymentAmount)}</strong></div>
-        <div class="metric"><span>贷款综合成本（IRR）</span><strong>${formatIrr(snapshot.loanIrrPercent)}</strong></div>
+        <div class="metric"><span>综合年化融资成本（IRR）</span><strong>${formatIrr(snapshot.loanIrrPercent)}</strong></div>
         <div class="metric"><span>${snapshot.ownershipYears} 年总成本</span><strong>${formatPrice(snapshot.ownershipTotal)}</strong></div>
       </div>
     </section>
@@ -918,7 +885,18 @@ export default function Home() {
       : financePlan === "nio-seven-year"
         ? officialSevenYearQuote
         : customLoanQuote;
-  const loanIrrPercent = calculateAnnualizedIrr([loanPrincipal, ...loanQuote.monthlyPayments.map((payment) => -payment)]);
+  // Treat a borrower-paid finance service fee as a loan-related cost paid at
+  // disbursement. This follows the all-in cash-flow approach used for IRR.
+  const loanIrrPercent = calculateAnnualizedIrr([
+    loanPrincipal - financeServiceFee,
+    ...loanQuote.monthlyPayments.map((payment) => -payment),
+  ]);
+  const displayedRateLabel =
+    financePlan === "nio-five-year"
+      ? "前 36 期 0% / 后 24 期 3%"
+      : financePlan === "nio-seven-year"
+        ? "0.99%"
+        : formatPercent(annualRate);
   const selectedFinancePlan = financePresets.find((preset) => preset.key === financePlan) ?? financePresets[0];
   const earlyPayoffEligibleMonth = financePlan === "nio-five-year" ? 36 : financePlan === "nio-seven-year" ? 3 : 0;
   const earlyPayoffAmount =
@@ -1016,6 +994,7 @@ export default function Home() {
     monthlyItems: monthlyFeeItems,
   };
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Saved bills live in browser storage and can only be restored after hydration. */
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(BILL_STORAGE_KEY);
@@ -1030,6 +1009,7 @@ export default function Home() {
       setSavedBillsLoaded(true);
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!savedBillsLoaded) return;
@@ -1276,7 +1256,7 @@ export default function Home() {
             <section className="timeline-card" id="journey">
               <div className="timeline-head">
                 <div>
-                  <p className="eyebrow">Buyer's journey</p>
+                  <p className="eyebrow">Buyer journey</p>
                   <h3>买车阶段时间线</h3>
                 </div>
                 <button type="button" className={selectedStage === "all" ? "filter-chip active" : "filter-chip"} onClick={() => chooseStage("all")}>全部阶段</button>
@@ -1500,7 +1480,7 @@ export default function Home() {
                 <small className="input-help">例如 5 年 = 60 期，这是贷款合同的总月数。</small>
               </label>
               <label className="budget-input">
-                <span>年化费率</span>
+                <span>方案标示年化费率</span>
                 <input min="0" max="24" step="0.1" type="number" value={annualRate === 0 ? "" : annualRate} onChange={(event) => { switchToCustomPlan(); setAnnualRate(Math.min(24, Math.max(0, Number(event.target.value) || 0))); }} />
               </label>
               <label className="budget-input">
@@ -1575,8 +1555,9 @@ export default function Home() {
                 <input min="0" step="100" type="number" value={registrationFee === 0 ? "" : registrationFee} onChange={(event) => { switchToCustomPlan(); setRegistrationFee(Math.max(0, Number(event.target.value) || 0)); }} />
               </label>
               <label className="budget-input">
-                <span>金融服务费</span>
+                <span>金融服务费（计入 IRR）</span>
                 <input min="0" step="100" type="number" value={financeServiceFee === 0 ? "" : financeServiceFee} onChange={(event) => { switchToCustomPlan(); setFinanceServiceFee(Math.max(0, Number(event.target.value) || 0)); }} />
+                <small className="input-help">默认按放款当期由借款人承担处理；实际收取方式不同，请以合同为准。</small>
               </label>
               <label className="budget-input">
                 <span>月充电 / 换电</span>
@@ -1626,10 +1607,10 @@ export default function Home() {
                   <div><span>贷款本金</span><strong>{formatPrice(loanPrincipal)}</strong></div>
                   <div><span>{financeMode === "equal-principal" ? "首月月供" : "月供"}</span><strong>{formatPrice(monthlyLoanPayment)}</strong></div>
                   <div><span>总利息</span><strong>{formatPrice(loanQuote.totalInterest)}</strong></div>
-                  <div className="irr-metric"><span>贷款综合成本（IRR）</span><strong>{formatIrr(loanIrrPercent)}</strong></div>
+                  <div className="irr-metric"><span>综合年化融资成本（IRR）</span><strong>{formatIrr(loanIrrPercent)}</strong></div>
                   <div><span>{ownershipYears} 年总成本</span><strong>{formatPrice(ownershipTotal)}</strong></div>
                 </div>
-                <p className="input-help irr-note">IRR 是按实际放款金额与每月还款现金流反推的年化成本，更适合横向比较不同融资方案；对普通用户，先看月供和总成本会更直观，最终以合同为准。</p>
+                <p className="input-help irr-note">IRR 按贷款本金、贷款相关费用与每月还款现金流反推，更适合横向比较不同方案。销售沟通建议先讲月供、总利息和总成本，再把 IRR 作为透明的比较口径；本页仅为估算，最终以金融机构的综合融资成本明示表和合同为准。</p>
               </>
             ) : (
               <div className="finance-details-card">
@@ -1637,7 +1618,7 @@ export default function Home() {
                 <div className="finance-detail-row"><span>首月本息合计</span><strong>{formatPrice(monthlyLoanPayment)}</strong></div>
                 <div className="finance-detail-row"><span>末月参考</span><strong>{formatPrice(loanQuote.lastPayment)}</strong></div>
                 <div className="finance-detail-row"><span>提前结清参考</span><strong>{formatPrice(payoffAtOwnership || earlyPayoffAmount)}</strong></div>
-                <div className="finance-detail-row"><span>年化费率 / IRR</span><strong>{formatPercent(annualRate)} / {formatIrr(loanIrrPercent)}</strong></div>
+                <div className="finance-detail-row"><span>方案标示费率 / 综合年化成本</span><strong>{displayedRateLabel} / {formatIrr(loanIrrPercent)}</strong></div>
               </div>
             )}
 
@@ -1694,6 +1675,7 @@ export default function Home() {
             <p>等额本息：月供 = 本金 × 月利率 × (1 + 月利率)^期数 ÷ [(1 + 月利率)^期数 - 1]。</p>
             <p>等额本金：每月偿还固定本金，利息按剩余本金递减。免息分期：贷款本金 ÷ 分期期数。</p>
             <p>购置税估算：含税成交价先按增值税折算率还原为不含税计税价，再按所选税收口径估算。BaaS 月租作为长期月度成本单独展示。</p>
+            <p>综合年化融资成本采用 IRR 复利口径，默认把金融服务费视为放款当期由借款人承担的贷款相关费用。<a href="https://xining.pbc.gov.cn/goutongjiaoliu/113456/113469/2025092212551432728/index.html" target="_blank" rel="noreferrer">查看中国人民银行口径 →</a></p>
           </section>
         </div>
 
