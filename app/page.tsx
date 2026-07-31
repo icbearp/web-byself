@@ -12,6 +12,7 @@ type FinanceMode = "equal-payment" | "equal-principal" | "interest-free";
 type PurchaseTaxMode = "new-energy" | "regular";
 type FinancePlanKey = "nio-five-year" | "nio-seven-year" | "custom";
 type WorkspaceKey = "home" | "records" | "car" | "finance" | "life";
+type HomeViewKey = "quick" | "about" | "columns";
 
 type Trim = {
   name: string;
@@ -838,6 +839,7 @@ function buildBillDocument(snapshot: FinanceBillSnapshot) {
 
 export default function Home() {
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("home");
+  const [homeView, setHomeView] = useState<HomeViewKey>("quick");
   const [selectedRecordCategory, setSelectedRecordCategory] = useState<RecordCategoryKey | "all">("all");
   const [selectedStage, setSelectedStage] = useState<StageKey | "all">("all");
   const [selectedDailyId, setSelectedDailyId] = useState("2026-07-29-content-collections");
@@ -1313,17 +1315,81 @@ export default function Home() {
       </section>}
 
       {activeWorkspace === "home" && <>
-      <section className="section profile-section" id="about">
-        <div className="profile-card">
-          <div className="profile-mark">周</div>
-          <div><p className="eyebrow">About the person behind the page</p><h2>{profile.name}</h2><p className="profile-role">{profile.role}</p><p>{profile.intro}</p><a className="text-link" href="mailto:otafukuchau@gmail.com">发邮件聊聊 →</a></div>
+      <section className="section compact-home-section" id="home-quick-links">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Quick access</p>
+            <h2>先看你最关心的入口，再细读内容。</h2>
+          </div>
+          <p className="section-lead">把长页面拆成几个更短的入口，用户可以更快判断自己应该从哪里开始。</p>
         </div>
-        <div className="profile-notes"><p className="eyebrow">个人信息维护</p><h3>让访客知道为什么可以信任这里的内容。</h3><ul>{profile.promise.map((item) => <li key={item}>{item}</li>)}</ul><p className="muted-note">这个区域以后可以继续维护个人经历、服务城市、预约方式和最新状态，主页结构已经预留好位置。</p></div>
+        <div className="home-quick-grid">
+          <button type="button" className="home-quick-card" onClick={() => setHomeView("about")}>
+            <span>关于我</span>
+            <strong>为什么值得信任这套内容</strong>
+            <p>了解我的判断标准、服务心态和长期更新方向。</p>
+          </button>
+          <button type="button" className="home-quick-card" onClick={() => setHomeView("columns")}>
+            <span>内容专栏</span>
+            <strong>四个栏目，按问题去看</strong>
+            <p>购车、效率、信息和生活建议，按主题快速进入。</p>
+          </button>
+          <button type="button" className="home-quick-card" onClick={() => selectWorkspace("finance")}>
+            <span>购车预算</span>
+            <strong>先算落地和月供，再看方案</strong>
+            <p>把首付、税费、贷款和长期成本放在一起。</p>
+          </button>
+          <button type="button" className="home-quick-card" onClick={() => selectWorkspace("records")}>
+            <span>每日记录</span>
+            <strong>按日期和阶段回看</strong>
+            <p>从买车阶段和生活经验里，找到最相关的一段记录。</p>
+          </button>
+        </div>
       </section>
 
-      <section className="section columns-section" id="columns">
-        <div className="section-heading"><div><p className="eyebrow">Four long-term columns</p><h2>四个长期栏目，回答不同的生活问题。</h2></div><p className="section-lead">不追热点，不把复杂事情说得更复杂。每个栏目都从一个真实问题开始，慢慢积累可以回看的答案。</p></div>
-        <div className="column-grid">{columns.map((column) => <button type="button" className={selectedColumn === column.key ? "column-card active" : "column-card"} key={column.key} onClick={() => { setSelectedColumn(column.key); selectWorkspace("life"); }}><img src={column.image} alt="" /><span>{column.label}</span><h3>{column.title}</h3><p>{column.copy}</p><b>查看这个专栏 ↓</b></button>)}</div>
+      <section className="section home-view-section" id="home-view-switcher">
+        <div className="home-view-nav" role="tablist" aria-label="主页内容切换">
+          <button type="button" role="tab" aria-selected={homeView === "quick"} className={homeView === "quick" ? "active" : ""} onClick={() => setHomeView("quick")}>入口总览</button>
+          <button type="button" role="tab" aria-selected={homeView === "about"} className={homeView === "about" ? "active" : ""} onClick={() => setHomeView("about")}>关于我</button>
+          <button type="button" role="tab" aria-selected={homeView === "columns"} className={homeView === "columns" ? "active" : ""} onClick={() => setHomeView("columns")}>内容专栏</button>
+        </div>
+
+        {homeView === "quick" && (
+          <div className="home-view-summary">
+            <div className="summary-card">
+              <p className="eyebrow">Today’s route</p>
+              <h3>适合先做一个小判断，而不是一口气看完全部内容。</h3>
+              <p>如果你正准备买车，就从预算和贷款入口开始；如果你只是想了解我，就先看关于我和内容专栏。</p>
+            </div>
+            <div className="summary-card compact">
+              <p className="eyebrow">Why it feels lighter</p>
+              <ul>
+                <li>每一块内容都只保留最重要的一句话。</li>
+                <li>长文内容改成收起/展开，减少一次性视觉负担。</li>
+                <li>导航入口更短，帮助访客更快进入最相关的部分。</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {homeView === "about" && (
+          <div className="home-view-grid">
+            <section className="profile-section" id="about">
+              <div className="profile-card">
+                <div className="profile-mark">周</div>
+                <div><p className="eyebrow">About the person behind the page</p><h2>{profile.name}</h2><p className="profile-role">{profile.role}</p><p>{profile.intro}</p><a className="text-link" href="mailto:otafukuchau@gmail.com">发邮件聊聊 →</a></div>
+              </div>
+              <div className="profile-notes"><p className="eyebrow">个人信息维护</p><h3>让访客知道为什么可以信任这里的内容。</h3><ul>{profile.promise.map((item) => <li key={item}>{item}</li>)}</ul><p className="muted-note">这个区域以后可以继续维护个人经历、服务城市、预约方式和最新状态，主页结构已经预留好位置。</p></div>
+            </section>
+          </div>
+        )}
+
+        {homeView === "columns" && (
+          <section className="section columns-section" id="columns">
+            <div className="section-heading"><div><p className="eyebrow">Four long-term columns</p><h2>四个长期栏目，回答不同的生活问题。</h2></div><p className="section-lead">不追热点，不把复杂事情说得更复杂。每个栏目都从一个真实问题开始，慢慢积累可以回看的答案。</p></div>
+            <div className="column-grid">{columns.map((column) => <button type="button" className={selectedColumn === column.key ? "column-card active" : "column-card"} key={column.key} onClick={() => { setSelectedColumn(column.key); selectWorkspace("life"); }}><img src={column.image} alt="" /><span>{column.label}</span><h3>{column.title}</h3><p>{column.copy}</p><b>查看这个专栏 ↓</b></button>)}</div>
+          </section>
+        )}
       </section>
       </>}
 

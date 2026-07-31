@@ -368,6 +368,103 @@ h3 {
   color: #fff;
 }
 
+.compact-home-section {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(240, 247, 242, 0.95));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.home-quick-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.home-quick-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  text-align: left;
+}
+
+.home-quick-card span {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-quick-card strong {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.home-quick-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.home-view-section {
+  display: grid;
+  gap: 14px;
+}
+
+.home-view-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-view-nav button {
+  background: #f7f8f5;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.home-view-nav button.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.home-view-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1.4fr 1fr;
+}
+
+.summary-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.summary-card.compact ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.summary-card.compact li {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .daily-entry,
 .record-browser,
 .timeline-card,
@@ -1483,6 +1580,11 @@ h3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .home-quick-grid,
+  .home-view-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workspace-switcher {
     align-items: flex-start;
     flex-direction: column;
@@ -1534,7 +1636,9 @@ h3 {
     grid-template-columns: 1fr;
   }
 
-  .record-collections {
+  .record-collections,
+  .home-quick-grid,
+  .home-view-summary {
     grid-template-columns: 1fr;
   }
 
