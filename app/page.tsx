@@ -10,6 +10,8 @@ type RecordCategoryKey = "car-info" | "career-growth" | "life-efficiency" | "sid
 type StageKey = "plan" | "online" | "offline" | "compare" | "experience" | "budget" | "communication" | "order" | "delivery" | "ownership";
 type FinanceMode = "equal-payment" | "equal-principal" | "interest-free";
 type PurchaseTaxMode = "new-energy" | "regular";
+type FinancePlanKey = "nio-five-year" | "nio-seven-year" | "custom";
+type WorkspaceKey = "home" | "records" | "car" | "finance" | "life";
 
 type Trim = {
   name: string;
@@ -66,6 +68,8 @@ type DailyRecord = {
 type LoanQuote = {
   monthlyRate: number;
   monthlyPayments: number[];
+  principalPayments: number[];
+  remainingPrincipalByMonth: number[];
   totalPayment: number;
   totalInterest: number;
   firstPayment: number;
@@ -76,6 +80,7 @@ type FinanceFormState = {
   selectedModel: ModelKey;
   selectedTrim: string;
   purchaseMode: PurchaseMode;
+  financePlan: FinancePlanKey;
   financeMode: FinanceMode;
   purchaseTaxMode: PurchaseTaxMode;
   manualVehiclePrice: number;
@@ -118,6 +123,11 @@ type FinanceBillSnapshot = FinanceFormState & {
   monthlyRunningCost: number;
   monthlyTotalFirstYear: number;
   ownershipTotal: number;
+  earlyPayoffEligibleMonth: number;
+  earlyPayoffAmount: number;
+  payoffAtOwnership: number;
+  planDescription: string;
+  loanIrrPercent: number | null;
   upfrontItems: FinanceSnapshotItem[];
   monthlyItems: FinanceSnapshotItem[];
 };
@@ -128,13 +138,12 @@ type SavedFinanceBill = {
   snapshot: FinanceBillSnapshot;
 };
 
-const navItems = [
-  { label: "关于我", href: "#about" },
-  { label: "每日记录", href: "#daily-record" },
-  { label: "四个专栏", href: "#columns" },
-  { label: "效率经验", href: "#efficiency" },
-  { label: "乐道车型", href: "#models" },
-  { label: "联系", href: "#contact" },
+const workspaceTabs: Array<{ key: WorkspaceKey; label: string; description: string }> = [
+  { key: "home", label: "首页", description: "认识周多福与四个长期栏目" },
+  { key: "records", label: "每日记录", description: "按日期、标签和购车阶段回看" },
+  { key: "car", label: "购车与车型", description: "乐道车型、家庭场景与官方信息" },
+  { key: "finance", label: "金融计算", description: "落地成本、月供、BaaS 与账单" },
+  { key: "life", label: "效率生活", description: "职场成长、效率方法与业余沉淀" },
 ];
 
 const profile = {
@@ -420,28 +429,43 @@ const knownOptions: KnownOption[] = [
   { id: "l60-rear-entertainment", label: "后排舒享娱乐套装", price: 10000, note: "该套装价格为 10,000 元；L60 Ultra 已标配。", models: ["l60"], excludedTrim: "Ultra" },
 ];
 
-const financePresets = [
+const financePresets: Array<{
+  key: FinancePlanKey;
+  label: string;
+  note: string;
+  badge: string;
+  downPaymentRate?: number;
+  termYears?: number;
+  annualRate?: number;
+  mode?: FinanceMode;
+}> = [
   {
-    label: "0 首付 / 3 年免息",
-    note: "适合模拟官方常见的短期免息方案，月供按本金平均分摊。",
+    key: "nio-five-year",
+    label: "官方 5 年免 3 年利息",
+    note: "前 3 年年化费率 0%，后 2 年年化费率 3%，满 3 年可申请一次性还清。",
+    badge: "0% / 3%",
     downPaymentRate: 0,
-    termYears: 3,
-    annualRate: 0,
-    mode: "interest-free" as FinanceMode,
+    termYears: 5,
+    annualRate: 3,
   },
   {
-    label: "20% 首付 / 7 年低息",
-    note: "适合模拟拉长期限降低月供，年化费率请填入实际审批结果。",
+    key: "nio-seven-year",
+    label: "官方 7 年超低息",
+    note: "年化费率 0.99%，三个月后可申请一次性还清。",
+    badge: "0.99%",
     downPaymentRate: 20,
     termYears: 7,
-    mode: "equal-payment" as FinanceMode,
+    annualRate: 0.99,
   },
   {
-    label: "30% 首付 / 5 年标准",
-    note: "适合多数用户先看长期现金流压力，再决定是否缩短年限。",
+    key: "custom",
+    label: "高自由度自定义",
+    note: "自己填首付、年限、费率、月供方式，适合做个人测算。",
+    badge: "自由填写",
     downPaymentRate: 30,
     termYears: 5,
-    mode: "equal-payment" as FinanceMode,
+    annualRate: 3.5,
+    mode: "equal-payment",
   },
 ];
 
@@ -456,6 +480,10 @@ const formatPrice = (value: number) => new Intl.NumberFormat("zh-CN", { style: "
 
 const formatPercent = (value: number) => `${value.toFixed(2).replace(/\.00$/, "")}%`;
 
+function formatIrr(value: number | null | undefined) {
+  return value === null || value === undefined ? "--" : formatPercent(value);
+}
+
 function calculatePurchaseTax(grossAmount: number, taxMode: PurchaseTaxMode, vatRate: number) {
   const vatFactor = 1 + vatRate / 100;
   const taxableBase = grossAmount / vatFactor;
@@ -467,11 +495,14 @@ function calculatePurchaseTax(grossAmount: number, taxMode: PurchaseTaxMode, vat
 function calculateLoanQuote(principal: number, annualRate: number, months: number, mode: FinanceMode): LoanQuote {
   const safeMonths = Math.max(1, Math.round(months));
   const monthlyRate = mode === "interest-free" ? 0 : annualRate / 100 / 12;
+  const remainingPrincipalByMonth = [Math.max(0, principal)];
 
   if (principal <= 0) {
     return {
       monthlyRate,
       monthlyPayments: Array.from({ length: safeMonths }, () => 0),
+      principalPayments: Array.from({ length: safeMonths }, () => 0),
+      remainingPrincipalByMonth: Array.from({ length: safeMonths + 1 }, () => 0),
       totalPayment: 0,
       totalInterest: 0,
       firstPayment: 0,
@@ -481,14 +512,20 @@ function calculateLoanQuote(principal: number, annualRate: number, months: numbe
 
   if (mode === "equal-principal") {
     const monthlyPrincipal = principal / safeMonths;
+    let balance = principal;
     const monthlyPayments = Array.from({ length: safeMonths }, (_, index) => {
       const outstanding = principal - monthlyPrincipal * index;
-      return monthlyPrincipal + outstanding * monthlyRate;
+      const payment = monthlyPrincipal + outstanding * monthlyRate;
+      balance = Math.max(0, balance - monthlyPrincipal);
+      remainingPrincipalByMonth.push(balance);
+      return payment;
     });
     const totalPayment = monthlyPayments.reduce((sum, payment) => sum + payment, 0);
     return {
       monthlyRate,
       monthlyPayments,
+      principalPayments: Array.from({ length: safeMonths }, () => monthlyPrincipal),
+      remainingPrincipalByMonth,
       totalPayment,
       totalInterest: totalPayment - principal,
       firstPayment: monthlyPayments[0] ?? 0,
@@ -502,16 +539,120 @@ function calculateLoanQuote(principal: number, annualRate: number, months: numbe
       : (principal * monthlyRate * Math.pow(1 + monthlyRate, safeMonths)) /
         (Math.pow(1 + monthlyRate, safeMonths) - 1);
 
-  const monthlyPayments = Array.from({ length: safeMonths }, () => monthlyPayment);
+  let balance = principal;
+  const principalPayments: number[] = [];
+  const monthlyPayments = Array.from({ length: safeMonths }, () => {
+    const interest = balance * monthlyRate;
+    const principalPayment = Math.min(balance, monthlyPayment - interest);
+    balance = Math.max(0, balance - principalPayment);
+    principalPayments.push(principalPayment);
+    remainingPrincipalByMonth.push(balance);
+    return monthlyPayment;
+  });
   const totalPayment = monthlyPayment * safeMonths;
   return {
     monthlyRate,
     monthlyPayments,
+    principalPayments,
+    remainingPrincipalByMonth,
     totalPayment,
     totalInterest: totalPayment - principal,
     firstPayment: monthlyPayment,
     lastPayment: monthlyPayment,
   };
+}
+
+function calculateFlatFeeLoan(principal: number, months: number, annualFeeRate: number, years: number): LoanQuote {
+  const safeMonths = Math.max(1, Math.round(months));
+  const balanceStart = Math.max(0, principal);
+  const totalInterest = balanceStart * (annualFeeRate / 100) * years;
+  const monthlyPrincipal = balanceStart / safeMonths;
+  const monthlyFee = totalInterest / safeMonths;
+  let balance = balanceStart;
+  const remainingPrincipalByMonth = [balanceStart];
+  const principalPayments: number[] = [];
+  const monthlyPayments = Array.from({ length: safeMonths }, () => {
+    balance = Math.max(0, balance - monthlyPrincipal);
+    principalPayments.push(monthlyPrincipal);
+    remainingPrincipalByMonth.push(balance);
+    return monthlyPrincipal + monthlyFee;
+  });
+
+  return {
+    monthlyRate: annualFeeRate / 100 / 12,
+    monthlyPayments,
+    principalPayments,
+    remainingPrincipalByMonth,
+    totalPayment: balanceStart + totalInterest,
+    totalInterest,
+    firstPayment: monthlyPayments[0] ?? 0,
+    lastPayment: monthlyPayments[safeMonths - 1] ?? 0,
+  };
+}
+
+function calculateNioFiveYearQuote(principal: number): LoanQuote {
+  const safePrincipal = Math.max(0, principal);
+  const months = 60;
+  const freeMonths = 36;
+  const lowRateMonths = 24;
+  const monthlyPrincipal = safePrincipal / months;
+  const remainingAfterFree = safePrincipal - monthlyPrincipal * freeMonths;
+  const lowInterestTotal = remainingAfterFree * 0.03 * 2;
+  const lowMonthlyFee = lowInterestTotal / lowRateMonths;
+  let balance = safePrincipal;
+  const remainingPrincipalByMonth = [safePrincipal];
+  const principalPayments: number[] = [];
+  const monthlyPayments = Array.from({ length: months }, (_, index) => {
+    balance = Math.max(0, balance - monthlyPrincipal);
+    principalPayments.push(monthlyPrincipal);
+    remainingPrincipalByMonth.push(balance);
+    return index < freeMonths ? monthlyPrincipal : monthlyPrincipal + lowMonthlyFee;
+  });
+
+  return {
+    monthlyRate: 0,
+    monthlyPayments,
+    principalPayments,
+    remainingPrincipalByMonth,
+    totalPayment: safePrincipal + lowInterestTotal,
+    totalInterest: lowInterestTotal,
+    firstPayment: monthlyPayments[0] ?? 0,
+    lastPayment: monthlyPayments[months - 1] ?? 0,
+  };
+}
+
+function calculateAnnualizedIrr(cashFlows: number[]): number | null {
+  if (cashFlows.length < 2 || !cashFlows.some((value) => value > 0) || !cashFlows.some((value) => value < 0)) return null;
+
+  const netPresentValue = (monthlyRate: number) =>
+    cashFlows.reduce((total, cashFlow, index) => total + cashFlow / Math.pow(1 + monthlyRate, index), 0);
+
+  let lower = -0.999999;
+  let upper = 1;
+  let lowerValue = netPresentValue(lower);
+  let upperValue = netPresentValue(upper);
+
+  while (lowerValue * upperValue > 0 && upper < 128) {
+    upper *= 2;
+    upperValue = netPresentValue(upper);
+  }
+
+  if (lowerValue * upperValue > 0) return null;
+
+  let midpoint = 0;
+  for (let iteration = 0; iteration < 100; iteration += 1) {
+    midpoint = (lower + upper) / 2;
+    const midpointValue = netPresentValue(midpoint);
+    if (Math.abs(midpointValue) < 0.000001) break;
+    if (lowerValue * midpointValue <= 0) {
+      upper = midpoint;
+    } else {
+      lower = midpoint;
+      lowerValue = midpointValue;
+    }
+  }
+
+  return (Math.pow(1 + midpoint, 12) - 1) * 100;
 }
 
 const BILL_STORAGE_KEY = "zhouduofu-finance-bills-v2";
@@ -546,6 +687,7 @@ function buildCsv(snapshot: FinanceBillSnapshot) {
     ["分类", "项目", "金额（元）", "说明"],
     ["概要", "称呼", snapshot.customerName, snapshot.billTitle],
     ["概要", "车型", `${snapshot.currentModelName} / ${snapshot.currentTrimName}`, snapshot.purchaseMode === "baas" ? "BaaS 租电" : "整车购买"],
+    ["概要", "金融方案", snapshot.financePlan, snapshot.planDescription],
     ["概要", "生成时间", snapshot.generatedAt, snapshot.billNote],
     ["一次性", "车辆小计", String(Math.round(snapshot.vehicleSubtotal)), "车辆成交价、官方选装、自定义预算"],
     ["一次性", "首付现金", String(Math.round(snapshot.downPaymentAmount)), `首付比例 ${snapshot.downPaymentRate}%`],
@@ -561,6 +703,8 @@ function buildCsv(snapshot: FinanceBillSnapshot) {
     ["汇总", "首月综合支出", String(Math.round(snapshot.monthlyTotalFirstYear)), "月供 + 月租 + 运行成本"],
     ["汇总", "贷款本金", String(Math.round(snapshot.loanPrincipal)), "扣除首付后的贷款金额"],
     ["汇总", "总利息", String(Math.round(snapshot.loanQuote.totalInterest)), "仅供估算"],
+    ["汇总", "综合年化成本（IRR）", formatIrr(snapshot.loanIrrPercent), "按实际放款与每期还款现金流估算，用于横向比较"],
+    ["汇总", "提前结清参考", String(Math.round(snapshot.earlyPayoffEligibleMonth > 0 ? snapshot.earlyPayoffAmount : snapshot.payoffAtOwnership)), snapshot.earlyPayoffEligibleMonth > 0 ? `满 ${snapshot.earlyPayoffEligibleMonth} 期后可申请` : "按持有期估算"],
     ["汇总", `${snapshot.ownershipYears} 年总成本`, String(Math.round(snapshot.ownershipTotal)), "首付 + 月供 + 税费 + 月度支出"],
   ];
 
@@ -646,7 +790,7 @@ function buildBillDocument(snapshot: FinanceBillSnapshot) {
         <div>
           <p class="eyebrow">Finance bill</p>
           <h1>${escapeHtml(snapshot.billTitle)}</h1>
-          <p class="lead">${escapeHtml(snapshot.customerName)} 的购车金融账单，生成于 ${escapeHtml(snapshot.generatedAt)}。车型：${escapeHtml(snapshot.currentModelName)} / ${escapeHtml(snapshot.currentTrimName)}。${escapeHtml(snapshot.billNote)}</p>
+          <p class="lead">${escapeHtml(snapshot.customerName)} 的购车金融账单，生成于 ${escapeHtml(snapshot.generatedAt)}。车型：${escapeHtml(snapshot.currentModelName)} / ${escapeHtml(snapshot.currentTrimName)}。${escapeHtml(snapshot.planDescription)} ${escapeHtml(snapshot.billNote)}</p>
         </div>
         <div class="badge">${escapeHtml(snapshot.purchaseMode === "baas" ? "BaaS 租电方案" : "整车购买方案")}</div>
       </div>
@@ -654,6 +798,7 @@ function buildBillDocument(snapshot: FinanceBillSnapshot) {
         <div class="metric"><span>首月综合支出</span><strong>${formatPrice(snapshot.monthlyTotalFirstYear)}</strong></div>
         <div class="metric"><span>贷款本金</span><strong>${formatPrice(snapshot.loanPrincipal)}</strong></div>
         <div class="metric"><span>首付现金</span><strong>${formatPrice(snapshot.downPaymentAmount)}</strong></div>
+        <div class="metric"><span>贷款综合成本（IRR）</span><strong>${formatIrr(snapshot.loanIrrPercent)}</strong></div>
         <div class="metric"><span>${snapshot.ownershipYears} 年总成本</span><strong>${formatPrice(snapshot.ownershipTotal)}</strong></div>
       </div>
     </section>
@@ -692,6 +837,7 @@ function buildBillDocument(snapshot: FinanceBillSnapshot) {
 }
 
 export default function Home() {
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("home");
   const [selectedRecordCategory, setSelectedRecordCategory] = useState<RecordCategoryKey | "all">("all");
   const [selectedStage, setSelectedStage] = useState<StageKey | "all">("all");
   const [selectedDailyId, setSelectedDailyId] = useState("2026-07-29-content-collections");
@@ -703,6 +849,7 @@ export default function Home() {
   const [selectedTrim, setSelectedTrim] = useState("Max");
   const [purchaseMode, setPurchaseMode] = useState<PurchaseMode>("vehicle");
   const [manualVehiclePrice, setManualVehiclePrice] = useState(202800);
+  const [financePlan, setFinancePlan] = useState<FinancePlanKey>("nio-five-year");
   const [financeMode, setFinanceMode] = useState<FinanceMode>("equal-payment");
   const [purchaseTaxMode, setPurchaseTaxMode] = useState<PurchaseTaxMode>("new-energy");
   const [downPaymentRate, setDownPaymentRate] = useState(20);
@@ -720,6 +867,7 @@ export default function Home() {
   const [parkingMonthly, setParkingMonthly] = useState(0);
   const [maintenanceMonthly, setMaintenanceMonthly] = useState(0);
   const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>("commute");
+  const [financeTab, setFinanceTab] = useState<"summary" | "details">("summary");
   const [customerName, setCustomerName] = useState("周先生");
   const [billTitle, setBillTitle] = useState("乐道购车金融账单");
   const [billNote, setBillNote] = useState("用于家庭讨论、试驾沟通和长期预算确认。");
@@ -756,9 +904,34 @@ export default function Home() {
   const purchaseTax = calculatePurchaseTax(vehicleSubtotal, purchaseTaxMode, vatRate);
   const downPaymentAmount = (vehicleSubtotal * downPaymentRate) / 100;
   const loanPrincipal = Math.max(0, vehicleSubtotal - downPaymentAmount);
-  const loanTermMonths = Math.max(1, Math.round(financeYears * 12));
+  const customLoanTermMonths = Math.max(1, Math.round(financeYears * 12));
+  const loanTermMonths = financePlan === "nio-five-year" ? 60 : financePlan === "nio-seven-year" ? 84 : customLoanTermMonths;
   const ownershipMonths = Math.max(1, Math.round(ownershipYears * 12));
-  const loanQuote = calculateLoanQuote(loanPrincipal, annualRate, loanTermMonths, financeMode);
+  const customLoanQuote = calculateLoanQuote(loanPrincipal, annualRate, customLoanTermMonths, financeMode);
+  const officialFiveYearQuote = calculateNioFiveYearQuote(loanPrincipal);
+  const officialSevenYearQuote = calculateFlatFeeLoan(loanPrincipal, 84, 0.99, 7);
+  const loanQuote =
+    financePlan === "nio-five-year"
+      ? officialFiveYearQuote
+      : financePlan === "nio-seven-year"
+        ? officialSevenYearQuote
+        : customLoanQuote;
+  const loanIrrPercent = calculateAnnualizedIrr([loanPrincipal, ...loanQuote.monthlyPayments.map((payment) => -payment)]);
+  const selectedFinancePlan = financePresets.find((preset) => preset.key === financePlan) ?? financePresets[0];
+  const earlyPayoffEligibleMonth = financePlan === "nio-five-year" ? 36 : financePlan === "nio-seven-year" ? 3 : 0;
+  const earlyPayoffAmount =
+    earlyPayoffEligibleMonth > 0
+      ? loanQuote.remainingPrincipalByMonth[Math.min(earlyPayoffEligibleMonth, loanQuote.remainingPrincipalByMonth.length - 1)] ?? 0
+      : 0;
+  const ownershipPayoffIndex = Math.min(ownershipMonths, loanQuote.remainingPrincipalByMonth.length - 1);
+  const canPayoffAtOwnership = ownershipMonths < loanTermMonths && (earlyPayoffEligibleMonth === 0 || ownershipMonths >= earlyPayoffEligibleMonth);
+  const payoffAtOwnership = canPayoffAtOwnership ? loanQuote.remainingPrincipalByMonth[ownershipPayoffIndex] ?? 0 : 0;
+  const planDescription =
+    financePlan === "nio-five-year"
+      ? "5 年 60 期：前 36 期年化费率 0%，后 24 期年化费率 3%（折合年化利率约 5.64%）；满 36 期可申请一次性结清。"
+      : financePlan === "nio-seven-year"
+        ? "7 年 84 期：按年化费率 0.99% 估算；满 3 期后可申请一次性结清。"
+        : `自定义 ${financeYears || 0} 年 ${customLoanTermMonths} 期，按你输入的年化利率和还款方式估算。`;
   const monthlyLoanPayment = loanQuote.monthlyPayments[0] ?? 0;
   const loanPaymentsInOwnershipWindow = loanQuote.monthlyPayments.slice(0, ownershipMonths).reduce((sum, payment) => sum + payment, 0);
   const batteryMonths = purchaseMode === "baas" ? ownershipMonths : 0;
@@ -773,7 +946,8 @@ export default function Home() {
     registrationFee +
     financeServiceFee +
     batteryRentTotal +
-    monthlyRunningCost * ownershipMonths;
+    monthlyRunningCost * ownershipMonths +
+    payoffAtOwnership;
   const repaymentSamples = loanQuote.monthlyPayments.slice(0, Math.min(12, loanQuote.monthlyPayments.length));
   const repaymentChartMax = Math.max(...repaymentSamples, 1);
   const upfrontFeeItems = [
@@ -785,7 +959,9 @@ export default function Home() {
     { label: "金融服务费", amount: financeServiceFee, note: "如方案没有该项，可保持为 0" },
   ];
   const monthlyFeeItems = [
-    { label: "金融月供", amount: monthlyLoanPayment, note: financeMode === "equal-principal" ? "等额本金首月最高，后续递减" : financeMode === "interest-free" ? "免息分期，本金平均摊还" : "等额本息，每月基本一致" },
+    { label: "金融月供", amount: monthlyLoanPayment, note: financePlan === "nio-five-year" ? "前 36 期免息月供，后 24 期会变化" : financePlan === "nio-seven-year" ? "7 年超低息方案估算月供" : financeMode === "equal-principal" ? "等额本金首月最高，后续递减" : financeMode === "interest-free" ? "免息分期，本金平均摊还" : "等额本息，每月基本一致" },
+    { label: "后段月供", amount: loanQuote.lastPayment, note: financePlan === "nio-five-year" ? "第 37-60 期参考月供" : "当前方案末期月供参考" },
+    { label: "提前结清参考", amount: payoffAtOwnership || earlyPayoffAmount, note: payoffAtOwnership > 0 ? `按持有 ${ownershipYears || 0} 年后一次结清估算` : earlyPayoffEligibleMonth > 0 ? `满 ${earlyPayoffEligibleMonth} 期可申请，具体以金融机构确认为准` : "持有期短于分期期限时显示" },
     { label: "BaaS 电池月租", amount: purchaseMode === "baas" ? batteryRentMonthly : 0, note: "仅选择租电方案时计入，按你的合同月租填写" },
     { label: "充电 / 换电", amount: chargingMonthly, note: "按个人通勤里程和补能习惯估算" },
     { label: "停车", amount: parkingMonthly, note: "车位、临停或单位停车费用" },
@@ -795,6 +971,7 @@ export default function Home() {
     selectedModel,
     selectedTrim,
     purchaseMode,
+    financePlan,
     financeMode,
     purchaseTaxMode,
     manualVehiclePrice,
@@ -828,6 +1005,11 @@ export default function Home() {
     monthlyRunningCost,
     monthlyTotalFirstYear,
     ownershipTotal,
+    earlyPayoffEligibleMonth,
+    earlyPayoffAmount,
+    payoffAtOwnership,
+    planDescription,
+    loanIrrPercent,
     upfrontItems: upfrontFeeItems,
     monthlyItems: monthlyFeeItems,
   };
@@ -882,12 +1064,15 @@ export default function Home() {
   }
 
   function applyFinancePreset(preset: typeof financePresets[number]) {
-    setDownPaymentRate(preset.downPaymentRate);
-    setFinanceYears(preset.termYears);
-    setFinanceMode(preset.mode);
-    if (preset.annualRate !== undefined) {
-      setAnnualRate(preset.annualRate);
-    }
+    setFinancePlan(preset.key);
+    if (preset.downPaymentRate !== undefined) setDownPaymentRate(preset.downPaymentRate);
+    if (preset.termYears !== undefined) setFinanceYears(preset.termYears);
+    if (preset.mode) setFinanceMode(preset.mode);
+    if (preset.annualRate !== undefined) setAnnualRate(preset.annualRate);
+  }
+
+  function switchToCustomPlan() {
+    setFinancePlan("custom");
   }
 
   function saveCurrentBill() {
@@ -909,6 +1094,7 @@ export default function Home() {
     setSelectedModel(form.selectedModel);
     setSelectedTrim(form.selectedTrim);
     setPurchaseMode(form.purchaseMode);
+    setFinancePlan(form.financePlan);
     setFinanceMode(form.financeMode);
     setPurchaseTaxMode(form.purchaseTaxMode);
     setManualVehiclePrice(form.manualVehiclePrice);
@@ -962,14 +1148,35 @@ export default function Home() {
     if (nextRecord) setSelectedDailyId(nextRecord.id);
   }
 
+  function selectWorkspace(workspace: WorkspaceKey) {
+    setActiveWorkspace(workspace);
+    window.requestAnimationFrame(() => {
+      document.getElementById("workspace-content")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function goToContact() {
+    setActiveWorkspace("home");
+    window.requestAnimationFrame(() => {
+      document.getElementById("contact")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   return (
     <main>
       <header className="site-header" aria-label="主导航">
-        <a className="brand" href="#top" aria-label="周多福首页">
+        <button className="brand brand-button" type="button" onClick={() => selectWorkspace("home")} aria-label="周多福首页">
           <span className="brand-mark">周</span>
           <span><strong>周多福</strong><small>乐道购车顾问 · 经验工作室</small></span>
-        </a>
-        <nav>{navItems.map((item) => <a href={item.href} key={item.href}>{item.label}</a>)}</nav>
+        </button>
+        <nav className="workspace-nav" aria-label="内容工作区">
+          {workspaceTabs.map((tab) => (
+            <button type="button" className={activeWorkspace === tab.key ? "active" : ""} key={tab.key} onClick={() => selectWorkspace(tab.key)}>
+              {tab.label}
+            </button>
+          ))}
+          <button type="button" onClick={goToContact}>联系</button>
+        </nav>
       </header>
 
       <section className="hero" id="top">
@@ -977,7 +1184,7 @@ export default function Home() {
           <p className="eyebrow">A practical personal studio</p>
           <h1>把买车、效率和生活经验，整理成真正能用的东西。</h1>
           <p className="hero-text">我是周多福。这里不是一张名片，也不是把信息堆在一起的网页，而是一间会持续更新的工作室：你可以读专栏、看效率经验、算乐道预算，也可以带着自己的生活问题来找答案。</p>
-          <div className="hero-actions"><a className="primary-action" href="#columns">先看四个专栏</a><a className="secondary-action" href="#calculator">直接算购车预算</a></div>
+          <div className="hero-actions"><button className="primary-action" type="button" onClick={() => selectWorkspace("life")}>先看四个专栏</button><button className="secondary-action" type="button" onClick={() => selectWorkspace("finance")}>直接算购车预算</button></div>
           <div className="hero-proof"><span>更新方向</span><strong>真诚、实用、可复用</strong><small>从生活场景出发，慢慢把答案做得更好。</small></div>
         </div>
         <div className="hero-panel"><img src="/images/home-hero.png" alt="家庭出行准备场景" /><div className="signal-card"><span>我的判断标准</span><strong>不急着成交，先把问题问对。</strong></div></div>
@@ -985,7 +1192,22 @@ export default function Home() {
 
       <section className="intro-band"><p>这里的每一块内容都有一个去处：先认识我，再读专栏；想提高效率，就看方法；准备买车，就进入场景和计算器。</p></section>
 
-      <section className="section daily-record-section" id="daily-record">
+      <section className="workspace-switcher" id="workspace-content" aria-label="内容分类">
+        <div>
+          <p className="eyebrow">Content spaces</p>
+          <h2>{workspaceTabs.find((tab) => tab.key === activeWorkspace)?.label}</h2>
+          <p>{workspaceTabs.find((tab) => tab.key === activeWorkspace)?.description}</p>
+        </div>
+        <div className="workspace-tab-list" role="tablist" aria-label="选择内容分类">
+          {workspaceTabs.map((tab) => (
+            <button type="button" role="tab" aria-selected={activeWorkspace === tab.key} className={activeWorkspace === tab.key ? "active" : ""} key={tab.key} onClick={() => selectWorkspace(tab.key)}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {activeWorkspace === "records" && <section className="section daily-record-section" id="daily-record">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Daily record</p>
@@ -1088,8 +1310,9 @@ export default function Home() {
           </div>
         </div>
         {activeCollection && <p className="collection-note">当前集合：{activeCollection.label}。{activeCollection.intro}</p>}
-      </section>
+      </section>}
 
+      {activeWorkspace === "home" && <>
       <section className="section profile-section" id="about">
         <div className="profile-card">
           <div className="profile-mark">周</div>
@@ -1100,9 +1323,11 @@ export default function Home() {
 
       <section className="section columns-section" id="columns">
         <div className="section-heading"><div><p className="eyebrow">Four long-term columns</p><h2>四个长期栏目，回答不同的生活问题。</h2></div><p className="section-lead">不追热点，不把复杂事情说得更复杂。每个栏目都从一个真实问题开始，慢慢积累可以回看的答案。</p></div>
-        <div className="column-grid">{columns.map((column) => <button type="button" className={selectedColumn === column.key ? "column-card active" : "column-card"} key={column.key} onClick={() => setSelectedColumn(column.key)}><img src={column.image} alt="" /><span>{column.label}</span><h3>{column.title}</h3><p>{column.copy}</p><b>查看这个专栏 ↓</b></button>)}</div>
+        <div className="column-grid">{columns.map((column) => <button type="button" className={selectedColumn === column.key ? "column-card active" : "column-card"} key={column.key} onClick={() => { setSelectedColumn(column.key); selectWorkspace("life"); }}><img src={column.image} alt="" /><span>{column.label}</span><h3>{column.title}</h3><p>{column.copy}</p><b>查看这个专栏 ↓</b></button>)}</div>
       </section>
+      </>}
 
+      {activeWorkspace === "life" && <>
       <section className="section article-section" id="articles">
         <div className="section-heading"><div><p className="eyebrow">Column answers</p><h2>从一个问题开始，读一篇能带走的回答。</h2></div><div className="article-tools"><label className="search-field"><span>搜索专栏</span><input type="search" placeholder="输入关键词" value={articleQuery} onChange={(event) => setArticleQuery(event.target.value)} /></label><button type="button" className={selectedColumn === "all" ? "filter-chip active" : "filter-chip"} onClick={() => setSelectedColumn("all")}>全部</button></div></div>
         <div className="article-filter">{columns.map((column) => <button type="button" className={selectedColumn === column.key ? "filter-chip active" : "filter-chip"} key={column.key} onClick={() => setSelectedColumn(column.key)}>{column.label}</button>)}</div>
@@ -1114,10 +1339,14 @@ export default function Home() {
         <div className="efficiency-image"><img src="/images/efficiency-desk.png" alt="桌面整理和效率经验场景" /></div>
         <div className="efficiency-copy"><p className="eyebrow">Efficiency experience</p><h2>效率不是把一天塞满，而是把重复消耗变少。</h2><p>这里会持续记录我在工作、资料整理和沟通中真正用过的方法。每一条经验都尽量拆成步骤，方便你判断是否适合自己的节奏。</p><div className="efficiency-list">{efficiencyNotes.map((note) => { const isOpen = expandedEfficiency === note.id; return <article className={isOpen ? "efficiency-item open" : "efficiency-item"} key={note.id}><button type="button" onClick={() => setExpandedEfficiency(isOpen ? null : note.id)}><span>{note.title}</span><b>{isOpen ? "收起" : "展开步骤"}</b></button><p>{note.summary}</p>{isOpen && <ol>{note.steps.map((step) => <li key={step}>{step}</li>)}</ol>}</article> })}</div></div>
       </section>
+      </>}
 
-      <section className="section model-section" id="models"><div className="section-heading"><div><p className="eyebrow">ONVO buyer guide</p><h2>乐道车型，放回你的家庭生活里选择。</h2></div><p className="section-lead">车型信息和价格会持续更新，先用场景理解差别，再用计算器把预算边界算清楚。</p></div><div className="model-grid">{(Object.keys(models) as ModelKey[]).map((modelKey) => { const model = models[modelKey]; return <article className="model-card" key={model.name}><div className="model-visual"><img src={model.image} alt="" /><span>{model.visualNote}</span><strong>{model.name}</strong></div><div className="model-card-body"><span>{model.subtitle}</span><h3>{model.name}</h3><p>{model.headline}</p><div className="price-row"><strong>{formatPrice(model.trims[0].vehiclePrice)} 起</strong><small>BaaS {formatPrice(model.trims[0].baasPrice)} 起</small></div><button type="button" onClick={() => { chooseModel(modelKey); document.getElementById("calculator")?.scrollIntoView({ behavior: "smooth" }); }}>放入计算器</button></div></article> })}</div></section>
+      {activeWorkspace === "car" && <>
+      <section className="section model-section" id="models"><div className="section-heading"><div><p className="eyebrow">ONVO buyer guide</p><h2>乐道车型，放回你的家庭生活里选择。</h2></div><p className="section-lead">车型信息和价格会持续更新，先用场景理解差别，再用计算器把预算边界算清楚。</p></div><div className="model-grid">{(Object.keys(models) as ModelKey[]).map((modelKey) => { const model = models[modelKey]; return <article className="model-card" key={model.name}><div className="model-visual"><img src={model.image} alt="" /><span>{model.visualNote}</span><strong>{model.name}</strong></div><div className="model-card-body"><span>{model.subtitle}</span><h3>{model.name}</h3><p>{model.headline}</p><div className="price-row"><strong>{formatPrice(model.trims[0].vehiclePrice)} 起</strong><small>BaaS {formatPrice(model.trims[0].baasPrice)} 起</small></div><button type="button" onClick={() => { chooseModel(modelKey); selectWorkspace("finance"); }}>放入计算器</button></div></article> })}</div></section>
 
-      <section className="section calculator-section" id="calculator">
+      </>}
+
+      {activeWorkspace === "finance" && <section className="section calculator-section" id="calculator">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Price calculator</p>
@@ -1130,8 +1359,14 @@ export default function Home() {
 
         <div className="finance-presets" aria-label="金融方案快捷填入">
           {financePresets.map((preset) => (
-            <button type="button" key={preset.label} onClick={() => applyFinancePreset(preset)}>
+            <button
+              type="button"
+              className={financePlan === preset.key ? "finance-card active" : "finance-card"}
+              key={preset.label}
+              onClick={() => applyFinancePreset(preset)}
+            >
               <span>{preset.label}</span>
+              <strong>{preset.badge}</strong>
               <small>{preset.note}</small>
             </button>
           ))}
@@ -1168,38 +1403,52 @@ export default function Home() {
               </div>
             </div>
 
+            <div className="plan-summary-card">
+              <p className="eyebrow">Plan summary</p>
+              <h3>{selectedFinancePlan.label}</h3>
+              <p>{planDescription}</p>
+              <div className="plan-summary-meta">
+                <span>分期：{loanTermMonths} 期</span>
+                <span>持有：{ownershipYears || 0} 年</span>
+                <span>结清参考：{formatPrice(earlyPayoffAmount || payoffAtOwnership)}</span>
+              </div>
+              <p className="input-help">分期年限是贷款合同总期数，持有年限是你计划开多久。比如 5 年 60 期、持有 3 年，就是先还 36 期，再看一次性结清要补多少。</p>
+            </div>
+
             <div className="control-grid">
               <label className="budget-input">
                 <span>车辆成交价 / BaaS 车价</span>
-                <input min="0" step="1000" type="number" value={manualVehiclePrice} onChange={(event) => setManualVehiclePrice(Math.max(0, Number(event.target.value) || 0))} />
+                <input min="0" step="1000" type="number" value={manualVehiclePrice === 0 ? "" : manualVehiclePrice} onChange={(event) => { switchToCustomPlan(); setManualVehiclePrice(Math.max(0, Number(event.target.value) || 0)); }} />
               </label>
               <label className="budget-input">
                 <span>自定义选装预算</span>
-                <input min="0" step="1000" type="number" value={customBudget} onChange={(event) => setCustomBudget(Math.max(0, Number(event.target.value) || 0))} />
+                <input min="0" step="1000" type="number" value={customBudget === 0 ? "" : customBudget} onChange={(event) => { switchToCustomPlan(); setCustomBudget(Math.max(0, Number(event.target.value) || 0)); }} />
               </label>
               <label className="budget-input">
                 <span>首付比例</span>
-                <input min="0" max="100" step="5" type="number" value={downPaymentRate} onChange={(event) => setDownPaymentRate(Math.min(100, Math.max(0, Number(event.target.value) || 0)))} />
+                <input min="0" max="100" step="5" type="number" value={downPaymentRate === 0 ? "" : downPaymentRate} onChange={(event) => { switchToCustomPlan(); setDownPaymentRate(Math.min(100, Math.max(0, Number(event.target.value) || 0))); }} />
               </label>
               <label className="budget-input">
-                <span>分期年限</span>
-                <input min="1" max="8" step="1" type="number" value={financeYears} onChange={(event) => setFinanceYears(Math.min(8, Math.max(1, Number(event.target.value) || 1)))} />
+                <span>分期年限（贷款合同）</span>
+                <input min="0" max="8" step="1" type="number" value={financeYears === 0 ? "" : financeYears} onChange={(event) => { switchToCustomPlan(); setFinanceYears(Math.min(8, Math.max(0, Number(event.target.value) || 0))); }} />
+                <small className="input-help">例如 5 年 = 60 期，这是贷款合同的总月数。</small>
               </label>
               <label className="budget-input">
                 <span>年化费率</span>
-                <input min="0" max="24" step="0.1" type="number" value={annualRate} onChange={(event) => setAnnualRate(Math.min(24, Math.max(0, Number(event.target.value) || 0)))} />
+                <input min="0" max="24" step="0.1" type="number" value={annualRate === 0 ? "" : annualRate} onChange={(event) => { switchToCustomPlan(); setAnnualRate(Math.min(24, Math.max(0, Number(event.target.value) || 0))); }} />
               </label>
               <label className="budget-input">
                 <span>BaaS 电池月租</span>
-                <input min="0" step="50" type="number" value={batteryRentMonthly} onChange={(event) => setBatteryRentMonthly(Math.max(0, Number(event.target.value) || 0))} />
+                <input min="0" step="50" type="number" value={batteryRentMonthly === 0 ? "" : batteryRentMonthly} onChange={(event) => { switchToCustomPlan(); setBatteryRentMonthly(Math.max(0, Number(event.target.value) || 0)); }} />
               </label>
               <label className="budget-input">
-                <span>持有年限</span>
-                <input min="1" max="10" step="1" type="number" value={ownershipYears} onChange={(event) => setOwnershipYears(Math.min(10, Math.max(1, Number(event.target.value) || 1)))} />
+                <span>持有年限（计划开多久）</span>
+                <input min="0" max="10" step="1" type="number" value={ownershipYears === 0 ? "" : ownershipYears} onChange={(event) => { switchToCustomPlan(); setOwnershipYears(Math.min(10, Math.max(0, Number(event.target.value) || 0))); }} />
+                <small className="input-help">例如持有 3 年后一次结清，系统会估算那一刻还剩多少本金。</small>
               </label>
               <label className="budget-input">
                 <span>增值税折算率</span>
-                <input min="0" max="20" step="0.5" type="number" value={vatRate} onChange={(event) => setVatRate(Math.min(20, Math.max(0, Number(event.target.value) || 0)))} />
+                <input min="0" max="20" step="0.5" type="number" value={vatRate === 0 ? "" : vatRate} onChange={(event) => { switchToCustomPlan(); setVatRate(Math.min(20, Math.max(0, Number(event.target.value) || 0))); }} />
               </label>
             </div>
 
@@ -1211,20 +1460,22 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="control-group">
-              <span className="control-label">金融方案</span>
-              <div className="segmented">
-                <button type="button" className={financeMode === "equal-payment" ? "active" : ""} onClick={() => setFinanceMode("equal-payment")}>等额本息</button>
-                <button type="button" className={financeMode === "equal-principal" ? "active" : ""} onClick={() => setFinanceMode("equal-principal")}>等额本金</button>
-                <button type="button" className={financeMode === "interest-free" ? "active" : ""} onClick={() => { setFinanceMode("interest-free"); setAnnualRate(0); }}>免息分期</button>
+            {financePlan === "custom" && (
+              <div className="control-group">
+                <span className="control-label">金融方案</span>
+                <div className="segmented">
+                  <button type="button" className={financeMode === "equal-payment" ? "active" : ""} onClick={() => { switchToCustomPlan(); setFinanceMode("equal-payment"); }}>等额本息</button>
+                  <button type="button" className={financeMode === "equal-principal" ? "active" : ""} onClick={() => { switchToCustomPlan(); setFinanceMode("equal-principal"); }}>等额本金</button>
+                  <button type="button" className={financeMode === "interest-free" ? "active" : ""} onClick={() => { switchToCustomPlan(); setFinanceMode("interest-free"); setAnnualRate(0); }}>免息分期</button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="control-group">
               <span className="control-label">购置税口径</span>
               <div className="segmented">
-                <button type="button" className={purchaseTaxMode === "new-energy" ? "active" : ""} onClick={() => setPurchaseTaxMode("new-energy")}>新能源减半</button>
-                <button type="button" className={purchaseTaxMode === "regular" ? "active" : ""} onClick={() => setPurchaseTaxMode("regular")}>普通车辆 10%</button>
+                <button type="button" className={purchaseTaxMode === "new-energy" ? "active" : ""} onClick={() => { switchToCustomPlan(); setPurchaseTaxMode("new-energy"); }}>新能源减半</button>
+                <button type="button" className={purchaseTaxMode === "regular" ? "active" : ""} onClick={() => { switchToCustomPlan(); setPurchaseTaxMode("regular"); }}>普通车辆 10%</button>
               </div>
             </div>
 
@@ -1251,27 +1502,27 @@ export default function Home() {
             <div className="fee-input-grid">
               <label className="budget-input">
                 <span>首年保险</span>
-                <input min="0" step="100" type="number" value={insuranceFee} onChange={(event) => setInsuranceFee(Math.max(0, Number(event.target.value) || 0))} />
+                <input min="0" step="100" type="number" value={insuranceFee === 0 ? "" : insuranceFee} onChange={(event) => { switchToCustomPlan(); setInsuranceFee(Math.max(0, Number(event.target.value) || 0)); }} />
               </label>
               <label className="budget-input">
                 <span>上牌登记</span>
-                <input min="0" step="100" type="number" value={registrationFee} onChange={(event) => setRegistrationFee(Math.max(0, Number(event.target.value) || 0))} />
+                <input min="0" step="100" type="number" value={registrationFee === 0 ? "" : registrationFee} onChange={(event) => { switchToCustomPlan(); setRegistrationFee(Math.max(0, Number(event.target.value) || 0)); }} />
               </label>
               <label className="budget-input">
                 <span>金融服务费</span>
-                <input min="0" step="100" type="number" value={financeServiceFee} onChange={(event) => setFinanceServiceFee(Math.max(0, Number(event.target.value) || 0))} />
+                <input min="0" step="100" type="number" value={financeServiceFee === 0 ? "" : financeServiceFee} onChange={(event) => { switchToCustomPlan(); setFinanceServiceFee(Math.max(0, Number(event.target.value) || 0)); }} />
               </label>
               <label className="budget-input">
                 <span>月充电 / 换电</span>
-                <input min="0" step="50" type="number" value={chargingMonthly} onChange={(event) => setChargingMonthly(Math.max(0, Number(event.target.value) || 0))} />
+                <input min="0" step="50" type="number" value={chargingMonthly === 0 ? "" : chargingMonthly} onChange={(event) => { switchToCustomPlan(); setChargingMonthly(Math.max(0, Number(event.target.value) || 0)); }} />
               </label>
               <label className="budget-input">
                 <span>月停车</span>
-                <input min="0" step="50" type="number" value={parkingMonthly} onChange={(event) => setParkingMonthly(Math.max(0, Number(event.target.value) || 0))} />
+                <input min="0" step="50" type="number" value={parkingMonthly === 0 ? "" : parkingMonthly} onChange={(event) => { switchToCustomPlan(); setParkingMonthly(Math.max(0, Number(event.target.value) || 0)); }} />
               </label>
               <label className="budget-input">
                 <span>月保养及杂费</span>
-                <input min="0" step="50" type="number" value={maintenanceMonthly} onChange={(event) => setMaintenanceMonthly(Math.max(0, Number(event.target.value) || 0))} />
+                <input min="0" step="50" type="number" value={maintenanceMonthly === 0 ? "" : maintenanceMonthly} onChange={(event) => { switchToCustomPlan(); setMaintenanceMonthly(Math.max(0, Number(event.target.value) || 0)); }} />
               </label>
             </div>
 
@@ -1296,14 +1547,33 @@ export default function Home() {
             <strong className="estimate-total">{formatPrice(monthlyTotalFirstYear)}</strong>
             <p>首月综合支出估算：金融月供 + BaaS 月租 + 充电 / 停车 / 保养等月度预算。</p>
 
-            <div className="finance-metrics">
-              <div><span>车辆小计</span><strong>{formatPrice(vehicleSubtotal)}</strong></div>
-              <div><span>首付现金</span><strong>{formatPrice(downPaymentAmount)}</strong></div>
-              <div><span>贷款本金</span><strong>{formatPrice(loanPrincipal)}</strong></div>
-              <div><span>{financeMode === "equal-principal" ? "首月月供" : "月供"}</span><strong>{formatPrice(monthlyLoanPayment)}</strong></div>
-              <div><span>总利息</span><strong>{formatPrice(loanQuote.totalInterest)}</strong></div>
-              <div><span>{ownershipYears} 年总成本</span><strong>{formatPrice(ownershipTotal)}</strong></div>
+            <div className="finance-tab-list" role="tablist" aria-label="金融结果切换">
+              <button type="button" role="tab" aria-selected={financeTab === "summary"} className={financeTab === "summary" ? "active" : ""} onClick={() => setFinanceTab("summary")}>摘要</button>
+              <button type="button" role="tab" aria-selected={financeTab === "details"} className={financeTab === "details" ? "active" : ""} onClick={() => setFinanceTab("details")}>明细</button>
             </div>
+
+            {financeTab === "summary" ? (
+              <>
+                <div className="finance-metrics">
+                  <div><span>车辆小计</span><strong>{formatPrice(vehicleSubtotal)}</strong></div>
+                  <div><span>首付现金</span><strong>{formatPrice(downPaymentAmount)}</strong></div>
+                  <div><span>贷款本金</span><strong>{formatPrice(loanPrincipal)}</strong></div>
+                  <div><span>{financeMode === "equal-principal" ? "首月月供" : "月供"}</span><strong>{formatPrice(monthlyLoanPayment)}</strong></div>
+                  <div><span>总利息</span><strong>{formatPrice(loanQuote.totalInterest)}</strong></div>
+                  <div className="irr-metric"><span>贷款综合成本（IRR）</span><strong>{formatIrr(loanIrrPercent)}</strong></div>
+                  <div><span>{ownershipYears} 年总成本</span><strong>{formatPrice(ownershipTotal)}</strong></div>
+                </div>
+                <p className="input-help irr-note">IRR 是按实际放款金额与每月还款现金流反推的年化成本，更适合横向比较不同融资方案；对普通用户，先看月供和总成本会更直观，最终以合同为准。</p>
+              </>
+            ) : (
+              <div className="finance-details-card">
+                <div className="finance-detail-row"><span>贷款期数</span><strong>{loanTermMonths} 期</strong></div>
+                <div className="finance-detail-row"><span>首月本息合计</span><strong>{formatPrice(monthlyLoanPayment)}</strong></div>
+                <div className="finance-detail-row"><span>末月参考</span><strong>{formatPrice(loanQuote.lastPayment)}</strong></div>
+                <div className="finance-detail-row"><span>提前结清参考</span><strong>{formatPrice(payoffAtOwnership || earlyPayoffAmount)}</strong></div>
+                <div className="finance-detail-row"><span>年化费率 / IRR</span><strong>{formatPercent(annualRate)} / {formatIrr(loanIrrPercent)}</strong></div>
+              </div>
+            )}
 
             <div className="repayment-chart" aria-label="前 12 个月还款趋势">
               <div className="chart-head">
@@ -1396,8 +1666,9 @@ export default function Home() {
             )}
           </section>
         </div>
-      </section>
+      </section>}
 
+      {activeWorkspace === "car" && <>
       <section className="section scenario-section" id="scenarios"><div className="section-heading"><div><p className="eyebrow">Lifestyle match</p><h2>按家庭和生活方式，而不是按参数表开始。</h2></div></div><div className="scenario-layout"><div className="scenario-tabs">{(Object.keys(scenarios) as ScenarioKey[]).map((key) => <button type="button" className={selectedScenario === key ? "active" : ""} key={key} onClick={() => { setSelectedScenario(key); chooseModel(scenarios[key].model); }}>{scenarios[key].label}</button>)}</div><article className="scenario-story"><span>推荐重点看 {models[scenario.model].name}</span><h3>{scenario.title}</h3><p>{scenario.story}</p><ul>{scenario.checklist.map((item) => <li key={item}>{item}</li>)}</ul></article></div></section>
 
       <section className="section highlights-section" id="highlights"><div className="section-heading"><div><p className="eyebrow">Model highlights</p><h2>车型亮点要讲成家人能听懂的话。</h2></div></div><div className="highlight-grid">{(Object.keys(models) as ModelKey[]).map((modelKey) => <article className="highlight-card" key={modelKey}><span>{models[modelKey].name}</span><h3>{models[modelKey].lifestyle}</h3><ul>{models[modelKey].highlights.map((item) => <li key={item}>{item}</li>)}</ul><p>{models[modelKey].advisorNote}</p></article>)}</div></section>
@@ -1434,8 +1705,9 @@ export default function Home() {
           </li>
         </ul>
       </section>
+      </>}
 
-      <section className="contact-section" id="contact"><div><p className="eyebrow">Contact</p><h2>想看车、试驾，或者想把一个生活问题聊清楚，可以从这里开始。</h2></div><div className="contact-methods">{contactMethods.map((method) => <a className="contact-method" href={method.href} key={method.label} target={method.label === "小红书号" ? "_blank" : undefined} rel={method.label === "小红书号" ? "noreferrer" : undefined}><span>{method.label}</span><strong>{method.value}</strong></a>)}</div></section>
+      {activeWorkspace === "home" && <section className="contact-section" id="contact"><div><p className="eyebrow">Contact</p><h2>想看车、试驾，或者想把一个生活问题聊清楚，可以从这里开始。</h2></div><div className="contact-methods">{contactMethods.map((method) => <a className="contact-method" href={method.href} key={method.label} target={method.label === "小红书号" ? "_blank" : undefined} rel={method.label === "小红书号" ? "noreferrer" : undefined}><span>{method.label}</span><strong>{method.value}</strong></a>)}</div></section>}
     </main>
   );
 }

@@ -31,10 +31,11 @@ test("server-renders the structured personal homepage", async () => {
   const html = await response.text();
   assert.match(html, /周多福/);
   assert.match(html, /四个长期栏目/);
-  assert.match(html, /怎样判断一辆车是否适合你的真实生活/);
-  assert.match(html, /效率不是把一天塞满/);
-  assert.match(html, /乐道 L60/);
-  assert.match(html, /Price calculator/);
+  assert.match(html, /讲清楚价格和边界/);
+  assert.match(html, /每日记录/);
+  assert.match(html, /购车与车型/);
+  assert.match(html, /金融计算/);
+  assert.match(html, /效率生活/);
   assert.match(html, /\/images\/home-hero\.png/);
 });
 
