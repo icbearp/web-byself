@@ -25,6 +25,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 90px;
 }
 
 body {
@@ -49,7 +50,8 @@ button {
 }
 
 main {
-  overflow: hidden;
+  overflow-x: clip;
+  padding-top: 75px;
 }
 
 .site-header {
@@ -63,8 +65,10 @@ main {
   justify-content: space-between;
   left: 0;
   padding: 16px clamp(20px, 5vw, 72px);
-  position: sticky;
+  position: fixed;
+  right: 0;
   top: 0;
+  width: 100%;
   z-index: 20;
 }
 
@@ -336,13 +340,13 @@ h3 {
 .daily-layout {
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(220px, 0.52fr) minmax(0, 0.95fr) minmax(320px, 0.88fr);
+  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1.58fr);
   margin-top: 18px;
 }
 
 .workspace-anchor {
   height: 0;
-  scroll-margin-top: 82px;
+  scroll-margin-top: 90px;
 }
 
 .home-view-section {
@@ -547,9 +551,11 @@ h3 {
   line-height: 1.45;
 }
 
-.daily-sidebar {
+.journey-dashboard {
   display: grid;
   gap: 18px;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.72fr);
+  margin-top: 18px;
 }
 
 .timeline-card,
@@ -569,17 +575,45 @@ h3 {
   font-size: clamp(26px, 4vw, 40px);
 }
 
+.journey-scroll {
+  margin-top: 22px;
+  overflow-x: auto;
+  padding: 2px 2px 14px;
+  scrollbar-color: rgba(45, 138, 103, 0.45) transparent;
+  scrollbar-width: thin;
+}
+
+.journey-scroll:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--green);
+  outline-offset: 4px;
+}
+
 .journey-list {
   display: grid;
   gap: 0;
+  grid-template-columns: repeat(10, minmax(108px, 1fr));
   list-style: none;
-  margin: 24px 0 0;
+  margin: 0;
+  min-width: 1080px;
   padding: 0;
+  position: relative;
+}
+
+.journey-list::before {
+  background: var(--line);
+  content: "";
+  height: 2px;
+  left: 5%;
+  position: absolute;
+  right: 5%;
+  top: 22px;
 }
 
 .journey-list li {
-  padding: 0 0 22px;
+  min-width: 0;
   position: relative;
+  z-index: 1;
 }
 
 .journey-list button {
@@ -587,26 +621,17 @@ h3 {
   border: 0;
   color: inherit;
   display: grid;
-  gap: 14px;
-  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 10px;
+  justify-items: center;
   padding: 0;
-  text-align: left;
+  text-align: center;
   width: 100%;
-}
-
-.journey-list li:not(:last-child)::after {
-  background: var(--line);
-  bottom: 0;
-  content: "";
-  left: 22px;
-  position: absolute;
-  top: 42px;
-  width: 1px;
 }
 
 .journey-list li.active span,
 .journey-list button:hover span {
   background: var(--green);
+  box-shadow: 0 0 0 6px rgba(45, 138, 103, 0.12);
 }
 
 .journey-list span {
@@ -627,13 +652,35 @@ h3 {
 .journey-list strong {
   color: var(--ink);
   display: block;
-  font-size: 18px;
-  margin-bottom: 6px;
+  font-size: 14px;
+  line-height: 1.35;
+  max-width: 102px;
 }
 
-.journey-list p {
+.journey-active-note {
+  background: var(--panel-strong);
+  border-left: 4px solid var(--green);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  min-height: 108px;
+  padding: 14px 16px;
+}
+
+.journey-active-note span {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.journey-active-note strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.journey-active-note p {
   color: var(--muted);
-  line-height: 1.7;
+  line-height: 1.6;
   margin: 0;
 }
 
@@ -657,6 +704,25 @@ h3 {
   color: var(--ink);
   font-weight: 800;
   padding: 14px 16px;
+}
+
+.compact-delivery-card h3 {
+  font-size: clamp(24px, 3vw, 32px);
+}
+
+.compact-delivery-card p {
+  line-height: 1.65;
+}
+
+.compact-delivery-card ul {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.compact-delivery-card li {
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 11px 12px;
 }
 
 .model-card {
@@ -1554,6 +1620,10 @@ h3 {
 }
 
 @media (max-width: 720px) {
+  main {
+    padding-top: 62px;
+  }
+
   .site-header {
     align-items: center;
     gap: 12px;
@@ -1594,12 +1664,21 @@ h3 {
     grid-template-columns: 1fr;
   }
 
+  .journey-dashboard,
+  .compact-delivery-card ul {
+    grid-template-columns: 1fr;
+  }
+
   .collection-card {
     min-height: auto;
   }
 
   .timeline-head {
     display: block;
+  }
+
+  .timeline-head .filter-chip {
+    margin-top: 12px;
   }
 
   .section-heading,

@@ -872,6 +872,7 @@ export default function Home() {
 
   const selectedDailyRecord = filteredDailyRecords.find((record) => record.id === selectedDailyId) ?? filteredDailyRecords[0] ?? dailyRecords[0];
   const activeCollection = selectedRecordCategory === "all" ? null : recordCollections.find((collection) => collection.key === selectedRecordCategory);
+  const activePurchaseStage = selectedStage === "all" ? null : purchaseStages.find((stage) => stage.key === selectedStage);
 
   const currentModel = models[selectedModel];
   const currentTrim = currentModel.trims.find((trim) => trim.name === selectedTrim) ?? currentModel.trims[0];
@@ -1263,8 +1264,10 @@ export default function Home() {
             </div>
           </article>
 
-          <div className="daily-sidebar">
-            <section className="timeline-card" id="journey">
+        </div>
+
+        <div className="journey-dashboard">
+          <section className="timeline-card" id="journey">
               <div className="timeline-head">
                 <div>
                   <p className="eyebrow">Buyer journey</p>
@@ -1272,22 +1275,26 @@ export default function Home() {
                 </div>
                 <button type="button" className={selectedStage === "all" ? "filter-chip active" : "filter-chip"} onClick={() => chooseStage("all")}>全部阶段</button>
               </div>
-              <ol className="journey-list">
-                {purchaseStages.map((item) => (
-                  <li key={item.step} className={selectedStage === item.key ? "active" : ""}>
-                    <button type="button" onClick={() => chooseStage(item.key)} aria-label={`查看${item.title}阶段的记录`}>
-                      <span>{item.step}</span>
-                      <div>
+              <div className="journey-scroll" tabIndex={0} aria-label="横向浏览买车阶段">
+                <ol className="journey-list">
+                  {purchaseStages.map((item) => (
+                    <li key={item.step} className={selectedStage === item.key ? "active" : ""}>
+                      <button type="button" aria-pressed={selectedStage === item.key} onClick={() => chooseStage(item.key)} aria-label={`查看${item.title}阶段的记录`}>
+                        <span>{item.step}</span>
                         <strong>{item.title}</strong>
-                        <p>{item.note}</p>
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            </section>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <div className="journey-active-note" aria-live="polite">
+                <span>{activePurchaseStage ? `阶段 ${activePurchaseStage.step}` : "全部阶段"}</span>
+                <strong>{activePurchaseStage?.title ?? "完整买车路径"}</strong>
+                <p>{activePurchaseStage?.note ?? "点击任一阶段，会同步筛选上方的相关记录；再次查看全部阶段可回到完整时间线。"}</p>
+              </div>
+          </section>
 
-            <section className="delivery-card">
+          <section className="delivery-card compact-delivery-card">
               <p className="eyebrow">Delivery service</p>
               <h3>交付后的用车生命周期服务</h3>
               <p>
@@ -1299,8 +1306,7 @@ export default function Home() {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-            </section>
-          </div>
+          </section>
         </div>
         {activeCollection && <p className="collection-note">当前集合：{activeCollection.label}。{activeCollection.intro}</p>}
       </section>}

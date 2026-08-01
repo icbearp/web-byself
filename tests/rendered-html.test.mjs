@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render() {
@@ -47,4 +47,16 @@ test("keeps generated lifestyle imagery local to the site", async () => {
     access(new URL("../public/images/family-planning.png", import.meta.url)),
     access(new URL("../public/images/efficiency-desk.png", import.meta.url)),
   ]);
+});
+
+test("keeps the primary navigation fixed and the buyer journey interactive", async () => {
+  const [pageSource, styles] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(styles, /\.site-header\s*\{[\s\S]*?position:\s*fixed;/);
+  assert.match(styles, /\.journey-list\s*\{[\s\S]*?grid-template-columns:\s*repeat\(10,/);
+  assert.match(pageSource, /aria-label="横向浏览买车阶段"/);
+  assert.match(pageSource, /aria-pressed=\{selectedStage === item\.key\}/);
 });
