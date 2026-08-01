@@ -13,7 +13,7 @@ type FinanceMode = "equal-payment" | "equal-principal" | "interest-free";
 type PurchaseTaxMode = "new-energy" | "regular";
 type FinancePlanKey = "nio-five-year" | "nio-seven-year" | "custom";
 type WorkspaceKey = "home" | "records" | "car" | "finance" | "life";
-type HomeViewKey = "quick" | "about" | "columns";
+type HomeViewKey = "about" | "columns";
 
 type Trim = {
   name: string;
@@ -678,11 +678,11 @@ function buildCsv(snapshot: FinanceBillSnapshot) {
     ["汇总", "结清前已付利息", String(Math.round(snapshot.interestPaidThroughSettlement)), "按选择的结清期数估算"],
     ["汇总", "综合年化融资成本（IRR）", formatIrr(snapshot.loanIrrPercent), "含用户填写的金融服务费，按实际现金流估算"],
     ["汇总", "整车购置成本", String(Math.round(snapshot.vehicleCost)), "整车成交价 + 购置税 + 上牌登记"],
-    ["汇总", "融资相关成本", String(Math.round(snapshot.financingCost)), "利息 + 金融服务费，不含贷款本金"],
+    ["汇总", "融资费用（利息 + 服务费）", String(Math.round(snapshot.financingCost)), "结清前已付利息 + 金融服务费，不含贷款本金"],
     ["汇总", "使用年限成本", String(Math.round(snapshot.usageCost)), `保险、BaaS 和用车支出（${snapshot.ownershipYears} 年）`],
     ["汇总", "结清期数", String(snapshot.settlementMonth), "按当前方案估算的结清时间"],
     ["汇总", "结清金额", String(Math.round(snapshot.settlementAmount)), "结清期剩余本金参考"],
-    ["汇总", `${snapshot.ownershipYears} 年总支出`, String(Math.round(snapshot.ownershipTotal)), "整车购置成本 + 融资相关成本 + 使用年限成本"],
+    ["汇总", `${snapshot.ownershipYears} 年总支出`, String(Math.round(snapshot.ownershipTotal)), "整车购置成本 + 融资费用 + 使用年限成本"],
   ];
 
   return rows.map((row) => row.map(makeCsvValue).join(",")).join("\n");
@@ -773,7 +773,7 @@ function buildBillDocument(snapshot: FinanceBillSnapshot) {
       </div>
       <div class="metrics">
         <div class="metric"><span>整车购置成本</span><strong>${formatPrice(snapshot.vehicleCost)}</strong></div>
-        <div class="metric"><span>融资相关成本</span><strong>${formatPrice(snapshot.financingCost)}</strong></div>
+        <div class="metric"><span>融资费用（利息 + 服务费）</span><strong>${formatPrice(snapshot.financingCost)}</strong></div>
         <div class="metric"><span>使用年限成本</span><strong>${formatPrice(snapshot.usageCost)}</strong></div>
         <div class="metric"><span>综合年化融资成本（IRR）</span><strong>${formatIrr(snapshot.loanIrrPercent)}</strong></div>
         <div class="metric"><span>${snapshot.ownershipYears} 年总支出</span><strong>${formatPrice(snapshot.ownershipTotal)}</strong></div>
@@ -815,7 +815,7 @@ function buildBillDocument(snapshot: FinanceBillSnapshot) {
 
 export default function Home() {
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("home");
-  const [homeView, setHomeView] = useState<HomeViewKey>("quick");
+  const [homeView, setHomeView] = useState<HomeViewKey>("about");
   const [selectedRecordCategory, setSelectedRecordCategory] = useState<RecordCategoryKey | "all">("all");
   const [selectedStage, setSelectedStage] = useState<StageKey | "all">("all");
   const [selectedDailyId, setSelectedDailyId] = useState("2026-07-29-content-collections");
@@ -940,6 +940,11 @@ export default function Home() {
   const interestPaidThroughSettlement = Math.max(0, financingCost - financeServiceFee);
   const usageCost = insuranceFee + batteryRentTotal + monthlyRunningCost * ownershipMonths;
   const ownershipTotal = vehicleCost + financingCost + usageCost;
+  const costBreakdown = [
+    { key: "vehicle", label: "整车购置", amount: vehicleCost },
+    { key: "finance", label: "融资费用", amount: financingCost },
+    { key: "usage", label: `${ownershipYears} 年使用`, amount: usageCost },
+  ];
   const repaymentSamples = loanQuote.monthlyPayments.slice(0, Math.min(12, loanQuote.monthlyPayments.length));
   const repaymentChartMax = Math.max(...repaymentSamples, 1);
   const upfrontFeeItems = [
@@ -1193,21 +1198,7 @@ export default function Home() {
       </section>
 
       <section className="intro-band"><p>这里的每一块内容都有一个去处：先认识我，再读专栏；想提高效率，就看方法；准备买车，就进入场景和计算器。</p></section>
-
-      <section className="workspace-switcher" id="workspace-content" aria-label="内容分类">
-        <div>
-          <p className="eyebrow">Content spaces</p>
-          <h2>{workspaceTabs.find((tab) => tab.key === activeWorkspace)?.label}</h2>
-          <p>{workspaceTabs.find((tab) => tab.key === activeWorkspace)?.description}</p>
-        </div>
-        <div className="workspace-tab-list" role="tablist" aria-label="选择内容分类">
-          {workspaceTabs.map((tab) => (
-            <button type="button" role="tab" aria-selected={activeWorkspace === tab.key} className={activeWorkspace === tab.key ? "active" : ""} key={tab.key} onClick={() => selectWorkspace(tab.key)}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </section>
+      <div className="workspace-anchor" id="workspace-content" aria-hidden="true" />
 
       {activeWorkspace === "records" && <section className="section daily-record-section" id="daily-record">
         <div className="section-heading">
@@ -1315,62 +1306,11 @@ export default function Home() {
       </section>}
 
       {activeWorkspace === "home" && <>
-      <section className="section compact-home-section" id="home-quick-links">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Quick access</p>
-            <h2>先看你最关心的入口，再细读内容。</h2>
-          </div>
-          <p className="section-lead">把长页面拆成几个更短的入口，用户可以更快判断自己应该从哪里开始。</p>
-        </div>
-        <div className="home-quick-grid">
-          <button type="button" className="home-quick-card" onClick={() => setHomeView("about")}>
-            <span>关于我</span>
-            <strong>为什么值得信任这套内容</strong>
-            <p>了解我的判断标准、服务心态和长期更新方向。</p>
-          </button>
-          <button type="button" className="home-quick-card" onClick={() => setHomeView("columns")}>
-            <span>内容专栏</span>
-            <strong>四个栏目，按问题去看</strong>
-            <p>购车、效率、信息和生活建议，按主题快速进入。</p>
-          </button>
-          <button type="button" className="home-quick-card" onClick={() => selectWorkspace("finance")}>
-            <span>购车预算</span>
-            <strong>先算落地和月供，再看方案</strong>
-            <p>把首付、税费、贷款和长期成本放在一起。</p>
-          </button>
-          <button type="button" className="home-quick-card" onClick={() => selectWorkspace("records")}>
-            <span>每日记录</span>
-            <strong>按日期和阶段回看</strong>
-            <p>从买车阶段和生活经验里，找到最相关的一段记录。</p>
-          </button>
-        </div>
-      </section>
-
       <section className="section home-view-section" id="home-view-switcher">
         <div className="home-view-nav" role="tablist" aria-label="主页内容切换">
-          <button type="button" role="tab" aria-selected={homeView === "quick"} className={homeView === "quick" ? "active" : ""} onClick={() => setHomeView("quick")}>入口总览</button>
           <button type="button" role="tab" aria-selected={homeView === "about"} className={homeView === "about" ? "active" : ""} onClick={() => setHomeView("about")}>关于我</button>
           <button type="button" role="tab" aria-selected={homeView === "columns"} className={homeView === "columns" ? "active" : ""} onClick={() => setHomeView("columns")}>内容专栏</button>
         </div>
-
-        {homeView === "quick" && (
-          <div className="home-view-summary">
-            <div className="summary-card">
-              <p className="eyebrow">Today’s route</p>
-              <h3>适合先做一个小判断，而不是一口气看完全部内容。</h3>
-              <p>如果你正准备买车，就从预算和贷款入口开始；如果你只是想了解我，就先看关于我和内容专栏。</p>
-            </div>
-            <div className="summary-card compact">
-              <p className="eyebrow">Why it feels lighter</p>
-              <ul>
-                <li>每一块内容都只保留最重要的一句话。</li>
-                <li>长文内容改成收起/展开，减少一次性视觉负担。</li>
-                <li>导航入口更短，帮助访客更快进入最相关的部分。</li>
-              </ul>
-            </div>
-          </div>
-        )}
 
         {homeView === "about" && (
           <div className="home-view-grid">
@@ -1379,7 +1319,7 @@ export default function Home() {
                 <div className="profile-mark">周</div>
                 <div><p className="eyebrow">About the person behind the page</p><h2>{profile.name}</h2><p className="profile-role">{profile.role}</p><p>{profile.intro}</p><a className="text-link" href="mailto:otafukuchau@gmail.com">发邮件聊聊 →</a></div>
               </div>
-              <div className="profile-notes"><p className="eyebrow">个人信息维护</p><h3>让访客知道为什么可以信任这里的内容。</h3><ul>{profile.promise.map((item) => <li key={item}>{item}</li>)}</ul><p className="muted-note">这个区域以后可以继续维护个人经历、服务城市、预约方式和最新状态，主页结构已经预留好位置。</p></div>
+              <div className="profile-notes"><p className="eyebrow">服务原则</p><h3>每一次沟通，都先把信息和选择边界讲清楚。</h3><ul>{profile.promise.map((item) => <li key={item}>{item}</li>)}</ul><p className="muted-note">服务范围：乐道车型选购、方案对比、试驾沟通与长期用车预算。</p></div>
             </section>
           </div>
         )}
@@ -1620,7 +1560,7 @@ export default function Home() {
           <aside className="estimate-panel finance-panel">
             <span className="estimate-kicker">{currentModel.name} {currentTrim.name} · {purchaseMode === "baas" ? "BaaS 租电" : "整车购买"}</span>
             <strong className="estimate-total">{formatPrice(ownershipTotal)}</strong>
-            <p>{ownershipYears} 年持有期总支出估算，已拆分整车购置、融资相关和使用年限成本。</p>
+            <p>{ownershipYears} 年持有期总支出估算，已拆分整车购置、融资费用和使用年限成本。</p>
 
             <div className="finance-tab-list" role="tablist" aria-label="金融结果切换">
               <button type="button" role="tab" aria-selected={financeTab === "summary"} className={financeTab === "summary" ? "active" : ""} onClick={() => setFinanceTab("summary")}>摘要</button>
@@ -1629,15 +1569,21 @@ export default function Home() {
 
             {financeTab === "summary" ? (
               <>
+                <div className="cost-breakdown" aria-label="持有期成本构成">
+                  <div className="cost-breakdown-head"><span>持有期成本构成</span><strong>{formatPrice(ownershipTotal)}</strong></div>
+                  {costBreakdown.map((item) => (
+                    <div className="cost-breakdown-row" key={item.key}>
+                      <div><span>{item.label}</span><strong>{formatPrice(item.amount)}</strong></div>
+                      <div className="cost-track" aria-hidden="true"><span className={`cost-fill ${item.key}`} style={{ width: `${Math.max(2, (item.amount / Math.max(ownershipTotal, 1)) * 100)}%` }} /></div>
+                    </div>
+                  ))}
+                </div>
                 <div className="finance-metrics">
-                  <div><span>整车购置成本</span><strong>{formatPrice(vehicleCost)}</strong></div>
-                  <div><span>融资相关成本</span><strong>{formatPrice(financingCost)}</strong></div>
-                  <div><span>使用年限成本</span><strong>{formatPrice(usageCost)}</strong></div>
                   <div><span>贷款本金</span><strong>{formatPrice(loanPrincipal)}</strong></div>
                   <div><span>结清前已付利息</span><strong>{formatPrice(interestPaidThroughSettlement)}</strong></div>
+                  <div><span>金融服务费</span><strong>{formatPrice(financeServiceFee)}</strong></div>
                   <div><span>方案标示费率</span><strong>{displayedRateLabel}</strong></div>
                   <div className="irr-metric"><span>综合年化融资成本（IRR）</span><strong>{formatIrr(loanIrrPercent)}</strong></div>
-                  <div><span>{ownershipYears} 年总支出</span><strong>{formatPrice(ownershipTotal)}</strong></div>
                 </div>
                 <p className="input-help irr-note">IRR 按贷款本金、贷款相关费用与每月还款现金流反推，更适合横向比较不同方案。销售沟通建议先讲月供、总利息和总成本，再把 IRR 作为透明的比较口径；本页仅为估算，最终以金融机构的综合融资成本明示表和合同为准。</p>
               </>
@@ -1647,7 +1593,9 @@ export default function Home() {
                 <div className="finance-detail-row"><span>结清期数</span><strong>{settlementMonth} 期</strong></div>
                 <div className="finance-detail-row"><span>结清金额</span><strong>{formatPrice(settlementAmount)}</strong></div>
                 <div className="finance-detail-row"><span>整车购置成本</span><strong>{formatPrice(vehicleCost)}</strong></div>
-                <div className="finance-detail-row"><span>融资相关成本</span><strong>{formatPrice(financingCost)}</strong></div>
+                <div className="finance-detail-row"><span>融资费用（利息 + 服务费）</span><strong>{formatPrice(financingCost)}</strong></div>
+                <div className="finance-detail-row"><span>其中：结清前已付利息</span><strong>{formatPrice(interestPaidThroughSettlement)}</strong></div>
+                <div className="finance-detail-row"><span>其中：金融服务费</span><strong>{formatPrice(financeServiceFee)}</strong></div>
                 <div className="finance-detail-row"><span>使用年限成本</span><strong>{formatPrice(usageCost)}</strong></div>
                 <div className="finance-detail-row"><span>方案标示费率 / 综合年化成本</span><strong>{displayedRateLabel} / {formatIrr(loanIrrPercent)}</strong></div>
               </div>

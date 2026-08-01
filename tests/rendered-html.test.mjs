@@ -30,10 +30,10 @@ test("server-renders the structured personal homepage", async () => {
 
   const html = await response.text();
   assert.match(html, /周多福/);
-  assert.match(html, /四个长期栏目/);
+  assert.match(html, /先看四个专栏/);
   assert.match(html, /关于我/);
   assert.match(html, /内容专栏/);
-  assert.match(html, /为什么值得信任这套内容/);
+  assert.match(html, /服务范围/);
   assert.match(html, /每日记录/);
   assert.match(html, /购车与车型/);
   assert.match(html, /金融计算/);
