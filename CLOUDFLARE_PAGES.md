@@ -43,6 +43,8 @@ git push origin main
 6. 重新部署 Pages 项目。
 7. 使用 `ADMIN_EMAIL` 对应的邮箱注册。必须先配置变量再注册，该账户才会被标记为管理员并看到私有收件箱。
 
+当前部署配置中的 D1 Database ID 是 `3a284656-b47b-4269-9498-db2845fc9aac`，已写入 `.openai/hosting.json`。如果未来更换数据库，可修改其中的 `d1_database_id`，或在构建环境设置 `D1_DATABASE_ID` 覆盖它。
+
 当前账户系统说明：
 
 - 密码只保存 PBKDF2 派生结果和随机盐，不保存明文密码。
