@@ -76,3 +76,21 @@ test("separates loan finance, first payment, and ownership-cost inputs", async (
   assert.match(pageSource, /\/api\/feedback/);
   assert.match(pageSource, /只用于贷款结清测算，不会改变下方的持有年限/);
 });
+
+test("supports guided accounts, cloud bills, and a private admin inbox", async () => {
+  const [pageSource, authSource, billSource, adminSource] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/_lib/auth.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/bills/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/admin/bills/route.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(pageSource, /注册前请确认/);
+  assert.match(pageSource, /我已阅读并同意以上服务提示/);
+  assert.match(pageSource, /不登录也能使用计算器/);
+  assert.match(pageSource, /留言与用户账单/);
+  assert.match(authSource, /PBKDF2/);
+  assert.match(authSource, /HttpOnly; Secure; SameSite=Lax/);
+  assert.match(billSource, /eq\(bills\.userId, user\.id\)/);
+  assert.match(adminSource, /user\.role !== "admin"/);
+});

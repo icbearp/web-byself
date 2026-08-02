@@ -15,6 +15,9 @@ type FinancePlanKey = "nio-five-year" | "nio-seven-year" | "custom";
 type WorkspaceKey = "home" | "records" | "car" | "finance" | "life";
 type HomeViewKey = "about" | "columns";
 type FeedbackType = "suggestion" | "question" | "experience";
+type AuthUser = { id: string; email: string; role: string };
+type AdminFeedbackItem = { id: number; type: string; message: string; contact: string; page: string; status: string; createdAt: string; userEmail?: string | null };
+type AdminBillItem = { id: string; title: string; createdAt: string; userEmail?: string | null; snapshot: FinanceBillSnapshot };
 
 type Trim = {
   name: string;
@@ -868,6 +871,18 @@ export default function Home() {
   const [feedbackWebsite, setFeedbackWebsite] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [feedbackStatusText, setFeedbackStatusText] = useState("");
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authConsent, setAuthConsent] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authStatusText, setAuthStatusText] = useState("");
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [billSaveStatus, setBillSaveStatus] = useState("");
+  const [adminFeedbackItems, setAdminFeedbackItems] = useState<AdminFeedbackItem[]>([]);
+  const [adminBillItems, setAdminBillItems] = useState<AdminBillItem[]>([]);
+  const [adminInboxOpen, setAdminInboxOpen] = useState(false);
 
   const filteredArticles = useMemo(() => {
     const query = articleQuery.trim().toLowerCase();
@@ -1069,6 +1084,25 @@ export default function Home() {
     }
   }, [savedBills, savedBillsLoaded]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function restoreAccount() {
+      try {
+        const response = await fetch("/api/auth/me");
+        const payload = (await response.json()) as { user?: AuthUser | null };
+        if (cancelled || !payload.user) return;
+        setAuthUser(payload.user);
+        const billResponse = await fetch("/api/bills");
+        const billPayload = (await billResponse.json()) as { bills?: SavedFinanceBill[] };
+        if (!cancelled && billResponse.ok && billPayload.bills) setSavedBills(billPayload.bills);
+      } catch {
+        // The public calculator remains usable when D1 is not connected yet.
+      }
+    }
+    void restoreAccount();
+    return () => { cancelled = true; };
+  }, []);
+
   function chooseModel(modelKey: ModelKey) {
     setSelectedModel(modelKey);
     setSelectedTrim(models[modelKey].trims[1]?.name ?? models[modelKey].trims[0].name);
@@ -1110,10 +1144,24 @@ export default function Home() {
     setFinancePlan("custom");
   }
 
-  function saveCurrentBill() {
+  async function saveCurrentBill() {
     const savedAt = new Date().toISOString();
-    const id = `${selectedModel}-${Date.now()}`;
+    const id = `${selectedModel}-${savedAt}`;
     const snapshot = { ...currentBillSnapshot, generatedAt: new Intl.DateTimeFormat("zh-CN", { dateStyle: "full", timeStyle: "short" }).format(new Date()) };
+    if (authUser) {
+      setBillSaveStatus("正在保存到云端…");
+      try {
+        const response = await fetch("/api/bills", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ snapshot }) });
+        const payload = (await response.json()) as SavedFinanceBill & { error?: string };
+        if (!response.ok) throw new Error(payload.error || "保存失败");
+        setSavedBills((current) => [payload, ...current.filter((item) => item.id !== payload.id)].slice(0, 30));
+        setBillSaveStatus("已保存到云端，可在其他设备登录后继续查看。");
+        return;
+      } catch (error) {
+        setBillSaveStatus(error instanceof Error ? error.message : "云端保存暂时失败。");
+        return;
+      }
+    }
     setSavedBills((current) => [
       {
         id,
@@ -1122,6 +1170,7 @@ export default function Home() {
       },
       ...current.slice(0, 11),
     ]);
+    setBillSaveStatus("已保存在当前浏览器。登录后可以跨设备保存。");
   }
 
   function loadSavedBill(item: SavedFinanceBill) {
@@ -1168,7 +1217,14 @@ export default function Home() {
     exportBillSnapshot(currentBillSnapshot, kind);
   }
 
-  function deleteSavedBill(id: string) {
+  async function deleteSavedBill(id: string) {
+    if (authUser) {
+      const response = await fetch("/api/bills", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
+      if (!response.ok) {
+        setBillSaveStatus("云端账单暂时无法删除，请稍后再试。");
+        return;
+      }
+    }
     setSavedBills((current) => current.filter((item) => item.id !== id));
   }
 
@@ -1198,6 +1254,61 @@ export default function Home() {
     window.requestAnimationFrame(() => {
       document.getElementById("contact")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  }
+
+  async function loadRemoteBills() {
+    const response = await fetch("/api/bills");
+    const payload = (await response.json()) as { bills?: SavedFinanceBill[]; error?: string };
+    if (!response.ok) throw new Error(payload.error || "账单暂时无法读取。");
+    setSavedBills(payload.bills ?? []);
+  }
+
+  async function submitAuth(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (authMode === "register" && !authConsent) {
+      setAuthStatusText("请先阅读并同意服务提示后再注册。");
+      return;
+    }
+    setAuthSubmitting(true);
+    setAuthStatusText("");
+    try {
+      const response = await fetch(`/api/auth/${authMode}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: authEmail, password: authPassword }) });
+      const payload = (await response.json()) as { user?: AuthUser; error?: string };
+      if (!response.ok || !payload.user) throw new Error(payload.error || "操作失败");
+      setAuthUser(payload.user);
+      setAuthPassword("");
+      setAuthOpen(false);
+      await loadRemoteBills();
+      setBillSaveStatus("登录成功；之后保存的账单会同步到云端。");
+    } catch (error) {
+      setAuthStatusText(error instanceof Error ? error.message : "登录暂时失败，请稍后再试。");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  async function logoutUser() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setAuthUser(null);
+    setAuthOpen(false);
+    setSavedBills([]);
+    setBillSaveStatus("已退出登录；当前浏览器仍可继续使用计算器。");
+  }
+
+  async function loadAdminInbox() {
+    try {
+      const [feedbackResponse, billsResponse] = await Promise.all([fetch("/api/admin/feedback"), fetch("/api/admin/bills")]);
+      const feedbackPayload = (await feedbackResponse.json()) as { feedback?: AdminFeedbackItem[]; error?: string };
+      const billsPayload = (await billsResponse.json()) as { bills?: AdminBillItem[]; error?: string };
+      if (!feedbackResponse.ok) throw new Error(feedbackPayload.error || "留言暂时无法读取。");
+      if (!billsResponse.ok) throw new Error(billsPayload.error || "账单暂时无法读取。");
+      setAdminFeedbackItems(feedbackPayload.feedback ?? []);
+      setAdminBillItems(billsPayload.bills ?? []);
+      setAdminInboxOpen(true);
+    } catch (error) {
+      setFeedbackStatus("error");
+      setFeedbackStatusText(error instanceof Error ? error.message : "管理员收件箱暂时无法读取。");
+    }
   }
 
   async function submitFeedback(event: FormEvent<HTMLFormElement>) {
@@ -1236,6 +1347,7 @@ export default function Home() {
             </button>
           ))}
           <button type="button" onClick={goToContact}>联系</button>
+          <button type="button" className="account-nav-button" onClick={() => setAuthOpen(true)}>{authUser ? "我的账户" : "登录"}</button>
         </nav>
       </header>
 
@@ -1657,7 +1769,8 @@ export default function Home() {
               <button type="button" onClick={() => exportCurrentBill("csv")}>导出表格 CSV</button>
               <button type="button" onClick={() => exportCurrentBill("html")}>导出文档 HTML</button>
             </div>
-            <p className="muted-note">保存内容会留在当前浏览器里，导出的表格和文档可直接发给家人、顾问或自己留档。</p>
+            {billSaveStatus && <p className="bill-save-status" role="status">{billSaveStatus}</p>}
+            <p className="muted-note">{authUser ? "当前为云端保存，登录同一账户即可跨设备查看。" : "未登录时只保存在当前浏览器；登录后可跨设备保存。"} 导出的表格和文档可直接发给家人、顾问或自己留档。</p>
           </aside>
         </div>
 
@@ -1900,7 +2013,91 @@ export default function Home() {
           <button className="feedback-submit" type="submit" disabled={feedbackStatus === "sending"}>{feedbackStatus === "sending" ? "正在提交…" : "提交留言"}</button>
           {feedbackStatusText && <p className={feedbackStatus === "success" ? "feedback-status success" : "feedback-status error"} role="status">{feedbackStatusText}</p>}
         </form>
+        {authUser?.role === "admin" && (
+          <aside className="admin-inbox" aria-labelledby="admin-inbox-heading">
+            <div className="admin-inbox-head">
+              <div>
+                <p className="eyebrow">Admin inbox</p>
+                <h3 id="admin-inbox-heading">留言与用户账单</h3>
+                <p>只有管理员账户可以查看。账单仅展示用户主动保存到云端的内容。</p>
+              </div>
+              <button type="button" onClick={loadAdminInbox}>{adminInboxOpen ? "刷新收件箱" : "打开收件箱"}</button>
+            </div>
+            {adminInboxOpen && (
+              <div className="admin-inbox-grid">
+                <section>
+                  <div className="admin-list-title"><strong>最新留言</strong><span>{adminFeedbackItems.length} 条</span></div>
+                  {adminFeedbackItems.length > 0 ? adminFeedbackItems.slice(0, 20).map((item) => (
+                    <article className="admin-inbox-item" key={item.id}>
+                      <div><strong>{item.type}</strong><time>{item.createdAt}</time></div>
+                      <p>{item.message}</p>
+                      <small>{item.userEmail || item.contact || "匿名留言"}</small>
+                    </article>
+                  )) : <p className="admin-empty">目前还没有留言。</p>}
+                </section>
+                <section>
+                  <div className="admin-list-title"><strong>云端账单</strong><span>{adminBillItems.length} 份</span></div>
+                  {adminBillItems.length > 0 ? adminBillItems.slice(0, 20).map((item) => (
+                    <article className="admin-inbox-item" key={item.id}>
+                      <div><strong>{item.title}</strong><time>{item.createdAt}</time></div>
+                      <p>{item.snapshot.currentModelName} · {item.snapshot.currentTrimName} · {formatPrice(item.snapshot.ownershipTotal)}</p>
+                      <small>{item.userEmail || "未知账户"}</small>
+                    </article>
+                  )) : <p className="admin-empty">目前还没有云端账单。</p>}
+                </section>
+              </div>
+            )}
+          </aside>
+        )}
       </section>}
+
+      {authOpen && (
+        <div className="auth-backdrop" role="presentation" onMouseDown={() => setAuthOpen(false)}>
+          <section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-heading" onMouseDown={(event) => event.stopPropagation()}>
+            <button className="auth-close" type="button" onClick={() => setAuthOpen(false)} aria-label="关闭账户窗口">×</button>
+            {authUser ? (
+              <div className="account-summary">
+                <p className="eyebrow">My account</p>
+                <h2 id="auth-dialog-heading">我的账户</h2>
+                <div className="account-email"><span>登录邮箱</span><strong>{authUser.email}</strong></div>
+                <p>你的账单会保存在云端，登录同一账户即可跨设备查看。你仍然可以逐份删除自己的账单。</p>
+                <div className="auth-actions">
+                  {authUser.role === "admin" && <button type="button" className="auth-primary" onClick={() => { setAuthOpen(false); goToContact(); void loadAdminInbox(); }}>查看管理员收件箱</button>}
+                  <button type="button" className="auth-secondary" onClick={logoutUser}>退出登录</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="eyebrow">Cloud account</p>
+                <h2 id="auth-dialog-heading">{authMode === "login" ? "登录并继续查看账单" : "创建你的云端账户"}</h2>
+                <p className="auth-intro">不登录也能使用计算器；只有需要跨设备保存账单时才需要账户。</p>
+                <div className="auth-tabs" role="tablist" aria-label="账户操作">
+                  <button type="button" className={authMode === "login" ? "active" : ""} onClick={() => { setAuthMode("login"); setAuthStatusText(""); }}>登录</button>
+                  <button type="button" className={authMode === "register" ? "active" : ""} onClick={() => { setAuthMode("register"); setAuthStatusText(""); }}>注册</button>
+                </div>
+                <form className="auth-form" onSubmit={submitAuth}>
+                  <label><span>邮箱</span><input required type="email" autoComplete="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="name@example.com" /></label>
+                  <label><span>密码</span><input required minLength={8} type="password" autoComplete={authMode === "login" ? "current-password" : "new-password"} value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="至少 8 位" /></label>
+                  {authMode === "register" && (
+                    <div className="service-notice">
+                      <strong>注册前请确认</strong>
+                      <ul>
+                        <li>你主动保存的账单会存入云端，用于跨设备查看和继续计算。</li>
+                        <li>网站管理员可以查看账单摘要及你主动提交的留言，以便提供服务。</li>
+                        <li>请不要在账单或留言中填写身份证、银行卡等不必要的敏感信息。</li>
+                        <li>你可以随时删除自己的单份账单；账户注销功能将在后续版本提供。</li>
+                      </ul>
+                      <label className="auth-consent"><input type="checkbox" checked={authConsent} onChange={(event) => setAuthConsent(event.target.checked)} /><span>我已阅读并同意以上服务提示</span></label>
+                    </div>
+                  )}
+                  <button className="auth-primary" type="submit" disabled={authSubmitting}>{authSubmitting ? "正在处理…" : authMode === "login" ? "登录" : "同意并注册"}</button>
+                  {authStatusText && <p className="auth-status" role="status">{authStatusText}</p>}
+                </form>
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </main>
   );
 }

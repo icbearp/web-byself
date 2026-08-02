@@ -1,5 +1,6 @@
 import { getDb } from "../../../db";
 import { feedback } from "../../../db/schema";
+import { getSessionUser } from "../_lib/auth";
 
 const feedbackTypes = new Set(["suggestion", "question", "experience"]);
 
@@ -33,7 +34,8 @@ export async function POST(request: Request) {
     if (contact.length > 200) return Response.json({ error: "联系方式过长，请检查后重试。" }, { status: 400 });
 
     const db = await getDb();
-    const [created] = await db.insert(feedback).values({ type, message, contact, page }).returning();
+    const user = await getSessionUser(request);
+    const [created] = await db.insert(feedback).values({ type, message, contact, page, userId: user?.id ?? null }).returning();
     return Response.json({ ok: true, feedback: created }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
