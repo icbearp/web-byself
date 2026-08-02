@@ -1203,7 +1203,8 @@ h3 {
   background: var(--green);
 }
 
-.ownership-section {
+.ownership-section,
+.upfront-section {
   background: linear-gradient(145deg, rgba(45, 138, 103, 0.08), rgba(255, 255, 255, 0.74));
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -1213,14 +1214,21 @@ h3 {
   padding: clamp(20px, 4vw, 32px);
 }
 
-.ownership-shell {
+.upfront-section {
+  background: linear-gradient(145deg, rgba(204, 138, 40, 0.09), rgba(255, 255, 255, 0.78));
+}
+
+.ownership-shell,
+.upfront-shell {
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
 }
 
 .ownership-input-panel,
-.ownership-result-panel {
+.ownership-result-panel,
+.upfront-input-panel,
+.upfront-result-panel {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1229,11 +1237,13 @@ h3 {
   padding: 20px;
 }
 
-.ownership-result-panel {
+.ownership-result-panel,
+.upfront-result-panel {
   align-self: start;
 }
 
-.ownership-result-panel > p {
+.ownership-result-panel > p,
+.upfront-result-panel > p {
   color: var(--muted);
   line-height: 1.65;
   margin: 0;
@@ -1242,6 +1252,41 @@ h3 {
 .ownership-monthly-total {
   color: var(--ink);
   font-size: clamp(34px, 5vw, 52px);
+}
+
+.upfront-total {
+  color: var(--ink);
+  font-size: clamp(36px, 5vw, 54px);
+}
+
+.upfront-fee-list .fee-row {
+  padding: 10px 12px;
+}
+
+.total-interest-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.total-interest-summary div {
+  background: #fff5df;
+  border: 1px solid rgba(204, 138, 40, 0.28);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 13px 14px;
+}
+
+.total-interest-summary span,
+.total-interest-summary small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.total-interest-summary strong {
+  color: var(--ink);
+  font-size: 20px;
 }
 
 .ownership-summary-grid {
@@ -1739,6 +1784,7 @@ h3 {
   .hero,
   .calculator-shell,
   .ownership-shell,
+  .upfront-shell,
   .daily-layout,
   .scenario-layout {
     grid-template-columns: 1fr;
@@ -1812,7 +1858,8 @@ h3 {
     grid-template-columns: 1fr;
   }
 
-  .ownership-summary-grid {
+  .ownership-summary-grid,
+  .total-interest-summary {
     grid-template-columns: 1fr;
   }
 

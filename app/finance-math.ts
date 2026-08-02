@@ -40,3 +40,12 @@ export function calculateAnnualizedIrr(cashFlows: number[]): number | null {
 
   return (Math.pow(1 + midpoint, 12) - 1) * 100;
 }
+
+export function calculateFiveYearFreeThreeTotalInterest(
+  principal: number,
+  annualFeeRatePercent = 3,
+): number {
+  const safePrincipal = Math.max(0, principal);
+  const safeRate = Math.max(0, annualFeeRatePercent) / 100;
+  return safePrincipal * safeRate * 2;
+}

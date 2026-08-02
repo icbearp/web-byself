@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { calculateAnnualizedIrr } from "../app/finance-math.ts";
+import { calculateAnnualizedIrr, calculateFiveYearFreeThreeTotalInterest } from "../app/finance-math.ts";
 
 test("annualizes a one-year borrower cash flow", () => {
   const irr = calculateAnnualizedIrr([
@@ -26,4 +26,9 @@ test("includes an upfront loan-related fee in all-in financing cost", () => {
 
 test("returns no IRR when there is no borrowing cash inflow", () => {
   assert.equal(calculateAnnualizedIrr([0, -1_000, -1_000]), null);
+});
+
+test("charges the last two years of the five-year free-three plan on original principal", () => {
+  assert.equal(calculateFiveYearFreeThreeTotalInterest(100_000), 6_000);
+  assert.equal(calculateFiveYearFreeThreeTotalInterest(200_000), 12_000);
 });

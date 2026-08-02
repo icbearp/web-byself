@@ -61,12 +61,16 @@ test("keeps the primary navigation fixed and the buyer journey interactive", asy
   assert.match(pageSource, /aria-pressed=\{selectedStage === item\.key\}/);
 });
 
-test("separates loan finance from ownership-cost inputs", async () => {
+test("separates loan finance, first payment, and ownership-cost inputs", async () => {
   const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
   assert.match(pageSource, />贷款金融</);
+  assert.match(pageSource, />税费、保险与首次付款</);
   assert.match(pageSource, />月持有与持有年限费用</);
+  assert.match(pageSource, /firstPaymentAmount/);
   assert.match(pageSource, /loanPayoffMonth/);
   assert.match(pageSource, /monthlyOwnershipCost/);
+  assert.match(pageSource, /贷款金额 × 3% × 2 年/);
+  assert.match(pageSource, /5\.64% 参考年化/);
   assert.match(pageSource, /只用于贷款结清测算，不会改变下方的持有年限/);
 });
