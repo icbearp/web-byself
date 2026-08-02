@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { calculateAnnualizedIrr, calculateFiveYearFreeThreeTotalInterest } from "./finance-math";
 
 type ModelKey = "l60" | "l80" | "l90";
@@ -14,6 +14,7 @@ type PurchaseTaxMode = "new-energy" | "regular";
 type FinancePlanKey = "nio-five-year" | "nio-seven-year" | "custom";
 type WorkspaceKey = "home" | "records" | "car" | "finance" | "life";
 type HomeViewKey = "about" | "columns";
+type FeedbackType = "suggestion" | "question" | "experience";
 
 type Trim = {
   name: string;
@@ -861,6 +862,12 @@ export default function Home() {
   const [billNote, setBillNote] = useState("用于家庭讨论、试驾沟通和长期预算确认。");
   const [savedBills, setSavedBills] = useState<SavedFinanceBill[]>([]);
   const [savedBillsLoaded, setSavedBillsLoaded] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<FeedbackType>("suggestion");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackContact, setFeedbackContact] = useState("");
+  const [feedbackWebsite, setFeedbackWebsite] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [feedbackStatusText, setFeedbackStatusText] = useState("");
 
   const filteredArticles = useMemo(() => {
     const query = articleQuery.trim().toLowerCase();
@@ -1191,6 +1198,28 @@ export default function Home() {
     window.requestAnimationFrame(() => {
       document.getElementById("contact")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  }
+
+  async function submitFeedback(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFeedbackStatus("sending");
+    setFeedbackStatusText("");
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: feedbackType, message: feedbackMessage, contact: feedbackContact, website: feedbackWebsite, page: activeWorkspace }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "提交失败");
+      setFeedbackMessage("");
+      setFeedbackContact("");
+      setFeedbackStatus("success");
+      setFeedbackStatusText("已收到，谢谢你把具体想法告诉我。后续更新我会优先参考这些建议。");
+    } catch (error) {
+      setFeedbackStatus("error");
+      setFeedbackStatusText(error instanceof Error ? error.message : "留言暂时没有提交成功，请稍后再试。");
+    }
   }
 
   return (
@@ -1853,7 +1882,25 @@ export default function Home() {
       </section>
       </>}
 
-      {activeWorkspace === "home" && <section className="contact-section" id="contact"><div><p className="eyebrow">Contact</p><h2>想看车、试驾，或者想把一个生活问题聊清楚，可以从这里开始。</h2></div><div className="contact-methods">{contactMethods.map((method) => <a className="contact-method" href={method.href} key={method.label} target={method.label === "小红书号" ? "_blank" : undefined} rel={method.label === "小红书号" ? "noreferrer" : undefined}><span>{method.label}</span><strong>{method.value}</strong></a>)}</div></section>}
+      {activeWorkspace === "home" && <section className="contact-section" id="contact">
+        <div className="contact-copy">
+          <p className="eyebrow">Contact</p>
+          <h2>想看车、试驾，或者想把一个生活问题聊清楚，可以从这里开始。</h2>
+          <p>如果你有建议、遇到问题，或者希望我补充某个计算口径，可以直接留言。留言会进入我的反馈列表，不会公开展示。</p>
+          <div className="contact-methods">{contactMethods.map((method) => <a className="contact-method" href={method.href} key={method.label} target={method.label === "小红书号" ? "_blank" : undefined} rel={method.label === "小红书号" ? "noreferrer" : undefined}><span>{method.label}</span><strong>{method.value}</strong></a>)}</div>
+        </div>
+        <form className="feedback-card" onSubmit={submitFeedback} aria-labelledby="feedback-heading">
+          <p className="eyebrow">Feedback</p>
+          <h3 id="feedback-heading">留言与建议</h3>
+          <p className="feedback-note">提交前请不要填写身份证号、银行卡号或其他不必要的敏感信息。</p>
+          <label className="feedback-field"><span>你想告诉我什么？</span><select value={feedbackType} onChange={(event) => setFeedbackType(event.target.value as FeedbackType)}><option value="suggestion">功能建议</option><option value="question">想问一个问题</option><option value="experience">使用体验</option></select></label>
+          <label className="feedback-field"><span>留言内容</span><textarea required minLength={2} maxLength={2000} rows={5} value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} placeholder="例如：希望增加某个贷款方案，或者哪里使用起来不顺手。" /></label>
+          <label className="feedback-field"><span>联系方式（选填）</span><input type="text" maxLength={200} value={feedbackContact} onChange={(event) => setFeedbackContact(event.target.value)} placeholder="邮箱、微信号或手机号，方便我回复你" /></label>
+          <label className="feedback-honeypot" aria-hidden="true">网站<input tabIndex={-1} autoComplete="off" value={feedbackWebsite} onChange={(event) => setFeedbackWebsite(event.target.value)} /></label>
+          <button className="feedback-submit" type="submit" disabled={feedbackStatus === "sending"}>{feedbackStatus === "sending" ? "正在提交…" : "提交留言"}</button>
+          {feedbackStatusText && <p className={feedbackStatus === "success" ? "feedback-status success" : "feedback-status error"} role="status">{feedbackStatusText}</p>}
+        </form>
+      </section>}
     </main>
   );
 }

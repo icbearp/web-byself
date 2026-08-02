@@ -72,5 +72,7 @@ test("separates loan finance, first payment, and ownership-cost inputs", async (
   assert.match(pageSource, /monthlyOwnershipCost/);
   assert.match(pageSource, /贷款金额 × 3% × 2 年/);
   assert.match(pageSource, /5\.64% 参考年化/);
+  assert.match(pageSource, /留言与建议/);
+  assert.match(pageSource, /\/api\/feedback/);
   assert.match(pageSource, /只用于贷款结清测算，不会改变下方的持有年限/);
 });
