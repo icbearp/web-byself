@@ -60,3 +60,13 @@ test("keeps the primary navigation fixed and the buyer journey interactive", asy
   assert.match(pageSource, /aria-label="横向浏览买车阶段"/);
   assert.match(pageSource, /aria-pressed=\{selectedStage === item\.key\}/);
 });
+
+test("separates loan finance from ownership-cost inputs", async () => {
+  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pageSource, />贷款金融</);
+  assert.match(pageSource, />月持有与持有年限费用</);
+  assert.match(pageSource, /loanPayoffMonth/);
+  assert.match(pageSource, /monthlyOwnershipCost/);
+  assert.match(pageSource, /只用于贷款结清测算，不会改变下方的持有年限/);
+});

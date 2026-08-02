@@ -92,6 +92,7 @@ type FinanceFormState = {
   financeYears: number;
   annualRate: number;
   fiveYearPayoffMonth: number;
+  loanPayoffMonth: number;
   ownershipYears: number;
   vatRate: number;
   insuranceFee: number;
@@ -834,6 +835,7 @@ export default function Home() {
   const [financeYears, setFinanceYears] = useState(5);
   const [annualRate, setAnnualRate] = useState(3.5);
   const [fiveYearPayoffMonth, setFiveYearPayoffMonth] = useState(36);
+  const [loanPayoffMonth, setLoanPayoffMonth] = useState(60);
   const [ownershipYears, setOwnershipYears] = useState(5);
   const [vatRate, setVatRate] = useState(13);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
@@ -911,7 +913,7 @@ export default function Home() {
   const settlementMonth =
     financePlan === "nio-five-year"
       ? Math.min(loanTermMonths, Math.max(36, Math.round(fiveYearPayoffMonth)))
-      : Math.min(loanTermMonths, ownershipMonths);
+      : Math.min(loanTermMonths, Math.max(1, Math.round(loanPayoffMonth)));
   const settlementAmount = settlementMonth < loanTermMonths
     ? loanQuote.remainingPrincipalByMonth[settlementMonth] ?? 0
     : 0;
@@ -936,9 +938,11 @@ export default function Home() {
   const batteryMonths = purchaseMode === "baas" ? ownershipMonths : 0;
   const batteryRentTotal = batteryRentMonthly * batteryMonths;
   const monthlyRunningCost = chargingMonthly + parkingMonthly + maintenanceMonthly;
+  const monthlyOwnershipCost = (purchaseMode === "baas" ? batteryRentMonthly : 0) + monthlyRunningCost;
   const vehicleCost = vehicleSubtotal + purchaseTax + registrationFee;
   const financingCost = Math.max(0, loanPaymentsThroughSettlement + settlementAmount - loanPrincipal + financeServiceFee);
   const interestPaidThroughSettlement = Math.max(0, financingCost - financeServiceFee);
+  const loanTotalRepayment = loanPaymentsThroughSettlement + settlementAmount + financeServiceFee;
   const usageCost = insuranceFee + batteryRentTotal + monthlyRunningCost * ownershipMonths;
   const ownershipTotal = vehicleCost + financingCost + usageCost;
   const costBreakdown = [
@@ -956,14 +960,17 @@ export default function Home() {
     { label: "上牌登记", amount: registrationFee, note: "上牌、临牌、登记或代办费用" },
     { label: "金融服务费", amount: financeServiceFee, note: "如方案没有该项，可保持为 0" },
   ];
-  const monthlyFeeItems = [
-    { label: "金融月供", amount: monthlyLoanPayment, note: financePlan === "nio-five-year" ? "前 36 期免息月供，后 24 期会变化" : financePlan === "nio-seven-year" ? "7 年超低息方案估算月供" : financeMode === "equal-principal" ? "等额本金首月最高，后续递减" : financeMode === "interest-free" ? "免息分期，本金平均摊还" : "等额本息，每月基本一致" },
-    { label: "后段月供", amount: loanQuote.lastPayment, note: financePlan === "nio-five-year" ? "第 37-60 期参考月供" : "当前方案末期月供参考" },
-    { label: "结清金额参考", amount: settlementAmount, note: financePlan === "nio-five-year" ? `按第 ${settlementMonth} 期结清估算` : payoffAtOwnership > 0 ? `按持有 ${ownershipYears || 0} 年后一次结清估算` : earlyPayoffEligibleMonth > 0 ? `满 ${earlyPayoffEligibleMonth} 期可申请，具体以金融机构确认为准` : "持有期短于分期期限时显示" },
+  const ownershipMonthlyFeeItems = [
     { label: "BaaS 电池月租", amount: purchaseMode === "baas" ? batteryRentMonthly : 0, note: "仅选择租电方案时计入，按你的合同月租填写" },
     { label: "充电 / 换电", amount: chargingMonthly, note: "按个人通勤里程和补能习惯估算" },
     { label: "停车", amount: parkingMonthly, note: "车位、临停或单位停车费用" },
     { label: "保养及杂费", amount: maintenanceMonthly, note: "洗车、耗材、轮胎、保养等长期支出" },
+  ];
+  const monthlyFeeItems = [
+    { label: "金融月供", amount: monthlyLoanPayment, note: financePlan === "nio-five-year" ? "前 36 期免息月供，后 24 期会变化" : financePlan === "nio-seven-year" ? "7 年超低息方案估算月供" : financeMode === "equal-principal" ? "等额本金首月最高，后续递减" : financeMode === "interest-free" ? "免息分期，本金平均摊还" : "等额本息，每月基本一致" },
+    { label: "后段月供", amount: loanQuote.lastPayment, note: financePlan === "nio-five-year" ? "第 37-60 期参考月供" : "当前方案末期月供参考" },
+    { label: "结清金额参考", amount: settlementAmount, note: financePlan === "nio-five-year" ? `按第 ${settlementMonth} 期结清估算` : payoffAtOwnership > 0 ? `按持有 ${ownershipYears || 0} 年后一次结清估算` : earlyPayoffEligibleMonth > 0 ? `满 ${earlyPayoffEligibleMonth} 期可申请，具体以金融机构确认为准` : "持有期短于分期期限时显示" },
+    ...ownershipMonthlyFeeItems,
   ];
   const currentBillSnapshot: FinanceBillSnapshot = {
     selectedModel,
@@ -979,6 +986,7 @@ export default function Home() {
     financeYears,
     annualRate,
     fiveYearPayoffMonth,
+    loanPayoffMonth,
     ownershipYears,
     vatRate,
     insuranceFee,
@@ -1073,7 +1081,10 @@ export default function Home() {
     setFinancePlan(preset.key);
     if (preset.key === "nio-five-year") setFiveYearPayoffMonth(36);
     if (preset.downPaymentRate !== undefined) setDownPaymentRate(preset.downPaymentRate);
-    if (preset.termYears !== undefined) setFinanceYears(preset.termYears);
+    if (preset.termYears !== undefined) {
+      setFinanceYears(preset.termYears);
+      setLoanPayoffMonth(preset.termYears * 12);
+    }
     if (preset.mode) setFinanceMode(preset.mode);
     if (preset.annualRate !== undefined) setAnnualRate(preset.annualRate);
   }
@@ -1111,6 +1122,7 @@ export default function Home() {
     setFinanceYears(form.financeYears);
     setAnnualRate(form.annualRate);
     setFiveYearPayoffMonth(form.fiveYearPayoffMonth ?? 36);
+    setLoanPayoffMonth(form.loanPayoffMonth ?? Math.max(1, Math.min(form.financeYears * 12, form.ownershipYears * 12)));
     setOwnershipYears(form.ownershipYears);
     setVatRate(form.vatRate);
     setInsuranceFee(form.insuranceFee);
@@ -1362,10 +1374,10 @@ export default function Home() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">Price calculator</p>
-            <h2>把落地费用、金融月供和 BaaS 月租放在一张清单里。</h2>
+            <h2>先把贷款算清楚，再看每月养车和长期持有成本。</h2>
           </div>
           <p className="section-lead">
-            先输入成交价和金融条件，再看首付、税费、月供、租电和长期用车成本。这里是估算工具，最终以门店报价、金融审批和合同为准。
+            页面分成两个步骤：上面只算贷款金融，下面再算月持有费用与持有年限总费用。这里是估算工具，最终以门店报价、金融审批和合同为准。
           </p>
         </div>
 
@@ -1386,6 +1398,10 @@ export default function Home() {
 
         <div className="calculator-shell finance-shell">
           <div className="calculator-controls">
+            <div className="calculator-step-heading">
+              <span>步骤 1</span>
+              <div><h3>贷款金融</h3><p>先看月供、利息、结清金额和 IRR。</p></div>
+            </div>
             <div className="control-group">
               <span className="control-label">车型</span>
               <div className="segmented">
@@ -1421,10 +1437,9 @@ export default function Home() {
               <p>{planDescription}</p>
               <div className="plan-summary-meta">
                 <span>分期：{loanTermMonths} 期</span>
-                <span>持有：{ownershipYears || 0} 年</span>
                 <span>第 {settlementMonth} 期结清：{formatPrice(settlementAmount)}</span>
               </div>
-              <p className="input-help">{financePlan === "nio-five-year" ? "分期固定为 5 年；可在第 36–60 期选择结清，使用年限成本则按下方持有年限单独计算。" : "分期年限是贷款合同总期数，持有年限是你计划开多久；持有期结束时会估算剩余本金。"}</p>
+              <p className="input-help">结清期数只影响贷款成本；下方持有年限只影响用车与持有费用，两者已经分开。</p>
             </div>
 
             {financePlan === "nio-five-year" && (
@@ -1435,42 +1450,42 @@ export default function Home() {
               </label>
             )}
 
-            <div className="control-grid">
+            {financePlan !== "nio-five-year" && (
+              <label className="budget-input payoff-month-input">
+                <span>计划结清期数</span>
+                <input min={Math.max(1, earlyPayoffEligibleMonth)} max={loanTermMonths} step="1" type="number" value={loanPayoffMonth} onChange={(event) => setLoanPayoffMonth(Math.min(loanTermMonths, Math.max(Math.max(1, earlyPayoffEligibleMonth), Number(event.target.value) || 1)))} />
+                <small className="input-help">只用于贷款结清测算，不会改变下方的持有年限。</small>
+              </label>
+            )}
+
+            <div className="control-grid finance-essential-grid">
               <label className="budget-input">
                 <span>车辆成交价 / BaaS 车价</span>
                 <input min="0" step="1000" type="number" value={manualVehiclePrice === 0 ? "" : manualVehiclePrice} onChange={(event) => setManualVehiclePrice(Math.max(0, Number(event.target.value) || 0))} />
-              </label>
-              <label className="budget-input">
-                <span>自定义选装预算</span>
-                <input min="0" step="1000" type="number" value={customBudget === 0 ? "" : customBudget} onChange={(event) => setCustomBudget(Math.max(0, Number(event.target.value) || 0))} />
               </label>
               <label className="budget-input">
                 <span>首付比例</span>
                 <input min="0" max="100" step="5" type="number" value={downPaymentRate === 0 ? "" : downPaymentRate} onChange={(event) => setDownPaymentRate(Math.min(100, Math.max(0, Number(event.target.value) || 0)))} />
               </label>
               <label className="budget-input">
-                <span>分期年限（贷款合同）</span>
-                <input min="0" max="8" step="1" type="number" value={financeYears === 0 ? "" : financeYears} onChange={(event) => { switchToCustomPlan(); setFinanceYears(Math.min(8, Math.max(0, Number(event.target.value) || 0))); }} />
-                <small className="input-help">例如 5 年 = 60 期，这是贷款合同的总月数。</small>
-              </label>
-              <label className="budget-input">
-                <span>方案标示年化费率</span>
-                <input min="0" max="24" step="0.1" type="number" value={annualRate === 0 ? "" : annualRate} onChange={(event) => { switchToCustomPlan(); setAnnualRate(Math.min(24, Math.max(0, Number(event.target.value) || 0))); }} />
-              </label>
-              <label className="budget-input">
-                <span>BaaS 电池月租</span>
-                <input min="0" step="50" type="number" value={batteryRentMonthly === 0 ? "" : batteryRentMonthly} onChange={(event) => setBatteryRentMonthly(Math.max(0, Number(event.target.value) || 0))} />
-              </label>
-              <label className="budget-input">
-                <span>持有年限（计划开多久）</span>
-                <input min="0" max="10" step="1" type="number" value={ownershipYears === 0 ? "" : ownershipYears} onChange={(event) => setOwnershipYears(Math.min(10, Math.max(0, Number(event.target.value) || 0)))} />
-                <small className="input-help">例如持有 3 年后一次结清，系统会估算那一刻还剩多少本金。</small>
-              </label>
-              <label className="budget-input">
-                <span>增值税折算率</span>
-                <input min="0" max="20" step="0.5" type="number" value={vatRate === 0 ? "" : vatRate} onChange={(event) => setVatRate(Math.min(20, Math.max(0, Number(event.target.value) || 0)))} />
+                <span>金融服务费（计入 IRR）</span>
+                <input min="0" step="100" type="number" value={financeServiceFee === 0 ? "" : financeServiceFee} onChange={(event) => setFinanceServiceFee(Math.max(0, Number(event.target.value) || 0))} />
+                <small className="input-help">没有该项可保持为 0。</small>
               </label>
             </div>
+
+            {financePlan === "custom" && (
+              <div className="control-grid custom-finance-grid">
+                <label className="budget-input">
+                  <span>分期年限（贷款合同）</span>
+                  <input min="0" max="8" step="1" type="number" value={financeYears === 0 ? "" : financeYears} onChange={(event) => { switchToCustomPlan(); setFinanceYears(Math.min(8, Math.max(0, Number(event.target.value) || 0))); }} />
+                </label>
+                <label className="budget-input">
+                  <span>方案标示年化费率</span>
+                  <input min="0" max="24" step="0.1" type="number" value={annualRate === 0 ? "" : annualRate} onChange={(event) => { switchToCustomPlan(); setAnnualRate(Math.min(24, Math.max(0, Number(event.target.value) || 0))); }} />
+                </label>
+              </div>
+            )}
 
             <div className="control-group">
               <span className="control-label">购买方式</span>
@@ -1491,63 +1506,45 @@ export default function Home() {
               </div>
             )}
 
-            <div className="control-group">
-              <span className="control-label">购置税口径</span>
-              <div className="segmented">
-                <button type="button" className={purchaseTaxMode === "new-energy" ? "active" : ""} onClick={() => setPurchaseTaxMode("new-energy")}>新能源减半</button>
-                <button type="button" className={purchaseTaxMode === "regular" ? "active" : ""} onClick={() => setPurchaseTaxMode("regular")}>普通车辆 10%</button>
-              </div>
-            </div>
-
-            <div className="control-group">
-              <span className="control-label">官方选装配置</span>
-              {visibleOptions.length > 0 ? (
-                <div className="option-list">
-                  {visibleOptions.map((option) => {
-                    const disabled = option.excludedTrim === currentTrim.name;
-                    const selected = selectedOptions.includes(option.id) && !disabled;
-                    return (
-                      <button type="button" className={selected ? "option-row active" : "option-row"} key={option.id} disabled={disabled} onClick={() => toggleOption(option)}>
-                        <span><strong>{option.label}</strong><small>{disabled ? "当前版本已包含" : option.note}</small></span>
-                        <b>{disabled ? "标配" : `+${formatPrice(option.price)}`}</b>
-                      </button>
-                    );
-                  })}
+            <details className="calculator-details">
+              <summary>选装、税费等高级设置</summary>
+              <div className="calculator-details-body">
+                <label className="budget-input">
+                  <span>自定义选装预算</span>
+                  <input min="0" step="1000" type="number" value={customBudget === 0 ? "" : customBudget} onChange={(event) => setCustomBudget(Math.max(0, Number(event.target.value) || 0))} />
+                </label>
+                <div className="control-group">
+                  <span className="control-label">购置税口径</span>
+                  <div className="segmented">
+                    <button type="button" className={purchaseTaxMode === "new-energy" ? "active" : ""} onClick={() => setPurchaseTaxMode("new-energy")}>新能源减半</button>
+                    <button type="button" className={purchaseTaxMode === "regular" ? "active" : ""} onClick={() => setPurchaseTaxMode("regular")}>普通车辆 10%</button>
+                  </div>
                 </div>
-              ) : (
-                <p className="muted-note">当前车型没有录入官方单项选装价格，可在自定义选装预算里单独填写。</p>
-              )}
-            </div>
+                <div className="control-group">
+                  <span className="control-label">官方选装配置</span>
+                  {visibleOptions.length > 0 ? (
+                    <div className="option-list">
+                      {visibleOptions.map((option) => {
+                        const disabled = option.excludedTrim === currentTrim.name;
+                        const selected = selectedOptions.includes(option.id) && !disabled;
+                        return (
+                          <button type="button" className={selected ? "option-row active" : "option-row"} key={option.id} disabled={disabled} onClick={() => toggleOption(option)}>
+                            <span><strong>{option.label}</strong><small>{disabled ? "当前版本已包含" : option.note}</small></span>
+                            <b>{disabled ? "标配" : `+${formatPrice(option.price)}`}</b>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="muted-note">当前车型没有录入官方单项选装价格，可在自定义选装预算里单独填写。</p>
+                  )}
+                </div>
+              </div>
+            </details>
 
-            <div className="fee-input-grid">
-              <label className="budget-input">
-                <span>首年保险</span>
-                <input min="0" step="100" type="number" value={insuranceFee === 0 ? "" : insuranceFee} onChange={(event) => setInsuranceFee(Math.max(0, Number(event.target.value) || 0))} />
-              </label>
-              <label className="budget-input">
-                <span>上牌登记</span>
-                <input min="0" step="100" type="number" value={registrationFee === 0 ? "" : registrationFee} onChange={(event) => setRegistrationFee(Math.max(0, Number(event.target.value) || 0))} />
-              </label>
-              <label className="budget-input">
-                <span>金融服务费（计入 IRR）</span>
-                <input min="0" step="100" type="number" value={financeServiceFee === 0 ? "" : financeServiceFee} onChange={(event) => setFinanceServiceFee(Math.max(0, Number(event.target.value) || 0))} />
-                <small className="input-help">默认按放款当期由借款人承担处理；实际收取方式不同，请以合同为准。</small>
-              </label>
-              <label className="budget-input">
-                <span>月充电 / 换电</span>
-                <input min="0" step="50" type="number" value={chargingMonthly === 0 ? "" : chargingMonthly} onChange={(event) => setChargingMonthly(Math.max(0, Number(event.target.value) || 0))} />
-              </label>
-              <label className="budget-input">
-                <span>月停车</span>
-                <input min="0" step="50" type="number" value={parkingMonthly === 0 ? "" : parkingMonthly} onChange={(event) => setParkingMonthly(Math.max(0, Number(event.target.value) || 0))} />
-              </label>
-              <label className="budget-input">
-                <span>月保养及杂费</span>
-                <input min="0" step="50" type="number" value={maintenanceMonthly === 0 ? "" : maintenanceMonthly} onChange={(event) => setMaintenanceMonthly(Math.max(0, Number(event.target.value) || 0))} />
-              </label>
-            </div>
-
-            <div className="bill-form-grid">
+            <details className="calculator-details bill-details">
+              <summary>账单信息（可选）</summary>
+              <div className="bill-form-grid calculator-details-body">
               <label className="budget-input">
                 <span>用户称呼</span>
                 <input type="text" value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="例如：周先生 / 王女士" />
@@ -1560,13 +1557,14 @@ export default function Home() {
                 <span>账单备注</span>
                 <textarea value={billNote} onChange={(event) => setBillNote(event.target.value)} rows={3} placeholder="例如：给家人一起看，主要关注月供和总成本。" />
               </label>
-            </div>
+              </div>
+            </details>
           </div>
 
           <aside className="estimate-panel finance-panel">
             <span className="estimate-kicker">{currentModel.name} {currentTrim.name} · {purchaseMode === "baas" ? "BaaS 租电" : "整车购买"}</span>
-            <strong className="estimate-total">{formatPrice(ownershipTotal)}</strong>
-            <p>{ownershipYears} 年持有期总支出估算，已拆分整车购置、融资费用和使用年限成本。</p>
+            <strong className="estimate-total">{formatPrice(monthlyLoanPayment)}<small>/ 月</small></strong>
+            <p>当前贷款方案的参考月供；持有和用车费用在下方单独计算。</p>
 
             <div className="finance-tab-list" role="tablist" aria-label="金融结果切换">
               <button type="button" role="tab" aria-selected={financeTab === "summary"} className={financeTab === "summary" ? "active" : ""} onClick={() => setFinanceTab("summary")}>摘要</button>
@@ -1575,19 +1573,12 @@ export default function Home() {
 
             {financeTab === "summary" ? (
               <>
-                <div className="cost-breakdown" aria-label="持有期成本构成">
-                  <div className="cost-breakdown-head"><span>持有期成本构成</span><strong>{formatPrice(ownershipTotal)}</strong></div>
-                  {costBreakdown.map((item) => (
-                    <div className="cost-breakdown-row" key={item.key}>
-                      <div><span>{item.label}</span><strong>{formatPrice(item.amount)}</strong></div>
-                      <div className="cost-track" aria-hidden="true"><span className={`cost-fill ${item.key}`} style={{ width: `${Math.max(2, (item.amount / Math.max(ownershipTotal, 1)) * 100)}%` }} /></div>
-                    </div>
-                  ))}
-                </div>
                 <div className="finance-metrics">
                   <div><span>贷款本金</span><strong>{formatPrice(loanPrincipal)}</strong></div>
+                  <div><span>首付现金</span><strong>{formatPrice(downPaymentAmount)}</strong></div>
                   <div><span>结清前已付利息</span><strong>{formatPrice(interestPaidThroughSettlement)}</strong></div>
                   <div><span>金融服务费</span><strong>{formatPrice(financeServiceFee)}</strong></div>
+                  <div><span>结清前总还款</span><strong>{formatPrice(loanTotalRepayment)}</strong></div>
                   <div><span>方案标示费率</span><strong>{displayedRateLabel}</strong></div>
                   <div className="irr-metric"><span>综合年化融资成本（IRR）</span><strong>{formatIrr(loanIrrPercent)}</strong></div>
                 </div>
@@ -1598,11 +1589,9 @@ export default function Home() {
                 <div className="finance-detail-row"><span>贷款期数</span><strong>{loanTermMonths} 期</strong></div>
                 <div className="finance-detail-row"><span>结清期数</span><strong>{settlementMonth} 期</strong></div>
                 <div className="finance-detail-row"><span>结清金额</span><strong>{formatPrice(settlementAmount)}</strong></div>
-                <div className="finance-detail-row"><span>整车购置成本</span><strong>{formatPrice(vehicleCost)}</strong></div>
                 <div className="finance-detail-row"><span>融资费用（利息 + 服务费）</span><strong>{formatPrice(financingCost)}</strong></div>
                 <div className="finance-detail-row"><span>其中：结清前已付利息</span><strong>{formatPrice(interestPaidThroughSettlement)}</strong></div>
                 <div className="finance-detail-row"><span>其中：金融服务费</span><strong>{formatPrice(financeServiceFee)}</strong></div>
-                <div className="finance-detail-row"><span>使用年限成本</span><strong>{formatPrice(usageCost)}</strong></div>
                 <div className="finance-detail-row"><span>方案标示费率 / 综合年化成本</span><strong>{displayedRateLabel} / {formatIrr(loanIrrPercent)}</strong></div>
               </div>
             )}
@@ -1629,40 +1618,116 @@ export default function Home() {
           </aside>
         </div>
 
-        <div className="cost-checklist">
-          <section>
-            <p className="eyebrow">Upfront cost</p>
-            <h3>一次性落地清单</h3>
-            <div className="fee-list">
-              {upfrontFeeItems.map((item) => (
-                <div className="fee-row" key={item.label}>
-                  <div><strong>{item.label}</strong><small>{item.note}</small></div>
-                  <span>{formatPrice(item.amount)}</span>
+        <section className="ownership-section" aria-labelledby="ownership-heading">
+          <div className="calculator-step-heading">
+            <span>步骤 2</span>
+            <div><h3 id="ownership-heading">月持有与持有年限费用</h3><p>贷款结果不变，在这里单独估算养车支出。</p></div>
+          </div>
+
+          <div className="ownership-shell">
+            <div className="ownership-input-panel">
+              <div className="control-grid ownership-input-grid">
+                <label className="budget-input">
+                  <span>持有年限</span>
+                  <input min="0" max="10" step="1" type="number" value={ownershipYears === 0 ? "" : ownershipYears} onChange={(event) => setOwnershipYears(Math.min(10, Math.max(0, Number(event.target.value) || 0)))} />
+                  <small className="input-help">用于计算这段时间内的总用车费用。</small>
+                </label>
+                <label className="budget-input">
+                  <span>BaaS 电池月租</span>
+                  <input min="0" step="50" type="number" value={batteryRentMonthly === 0 ? "" : batteryRentMonthly} onChange={(event) => setBatteryRentMonthly(Math.max(0, Number(event.target.value) || 0))} disabled={purchaseMode !== "baas"} />
+                  <small className="input-help">当前为{purchaseMode === "baas" ? "租电方案，已计入" : "整车购买，不计入月持有费用"}。</small>
+                </label>
+                <label className="budget-input">
+                  <span>首年保险</span>
+                  <input min="0" step="100" type="number" value={insuranceFee === 0 ? "" : insuranceFee} onChange={(event) => setInsuranceFee(Math.max(0, Number(event.target.value) || 0))} />
+                </label>
+                <label className="budget-input">
+                  <span>月充电 / 换电</span>
+                  <input min="0" step="50" type="number" value={chargingMonthly === 0 ? "" : chargingMonthly} onChange={(event) => setChargingMonthly(Math.max(0, Number(event.target.value) || 0))} />
+                </label>
+                <label className="budget-input">
+                  <span>月停车</span>
+                  <input min="0" step="50" type="number" value={parkingMonthly === 0 ? "" : parkingMonthly} onChange={(event) => setParkingMonthly(Math.max(0, Number(event.target.value) || 0))} />
+                </label>
+                <label className="budget-input">
+                  <span>月保养及杂费</span>
+                  <input min="0" step="50" type="number" value={maintenanceMonthly === 0 ? "" : maintenanceMonthly} onChange={(event) => setMaintenanceMonthly(Math.max(0, Number(event.target.value) || 0))} />
+                </label>
+              </div>
+
+              <details className="calculator-details">
+                <summary>上牌与税率设置</summary>
+                <div className="control-grid calculator-details-body">
+                  <label className="budget-input">
+                    <span>上牌登记</span>
+                    <input min="0" step="100" type="number" value={registrationFee === 0 ? "" : registrationFee} onChange={(event) => setRegistrationFee(Math.max(0, Number(event.target.value) || 0))} />
+                  </label>
+                  <label className="budget-input">
+                    <span>增值税折算率</span>
+                    <input min="0" max="20" step="0.5" type="number" value={vatRate === 0 ? "" : vatRate} onChange={(event) => setVatRate(Math.min(20, Math.max(0, Number(event.target.value) || 0)))} />
+                  </label>
                 </div>
-              ))}
+              </details>
             </div>
-          </section>
-          <section>
-            <p className="eyebrow">Monthly cost</p>
-            <h3>每月使用清单</h3>
-            <div className="fee-list">
-              {monthlyFeeItems.map((item) => (
-                <div className="fee-row" key={item.label}>
-                  <div><strong>{item.label}</strong><small>{item.note}</small></div>
-                  <span>{formatPrice(item.amount)}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-          <section className="formula-card">
-            <p className="eyebrow">Formula</p>
-            <h3>计算口径</h3>
-            <p>等额本息：月供 = 本金 × 月利率 × (1 + 月利率)^期数 ÷ [(1 + 月利率)^期数 - 1]。</p>
-            <p>等额本金：每月偿还固定本金，利息按剩余本金递减。免息分期：贷款本金 ÷ 分期期数。</p>
-            <p>购置税估算：含税成交价先按增值税折算率还原为不含税计税价，再按所选税收口径估算。BaaS 月租作为长期月度成本单独展示。</p>
-            <p>综合年化融资成本采用 IRR 复利口径，默认把金融服务费视为放款当期由借款人承担的贷款相关费用。<a href="https://xining.pbc.gov.cn/goutongjiaoliu/113456/113469/2025092212551432728/index.html" target="_blank" rel="noreferrer">查看中国人民银行口径 →</a></p>
-          </section>
-        </div>
+
+            <aside className="ownership-result-panel">
+              <span className="estimate-kicker">不含贷款月供的月持有费用</span>
+              <strong className="ownership-monthly-total">{formatPrice(monthlyOwnershipCost)}<small>/ 月</small></strong>
+              <p>BaaS 月租、补能、停车和保养杂费之和；贷款月供已在上方单独展示。</p>
+              <div className="ownership-summary-grid">
+                <div><span>{ownershipYears} 年使用费用</span><strong>{formatPrice(usageCost)}</strong></div>
+                <div><span>{ownershipYears} 年总支出</span><strong>{formatPrice(ownershipTotal)}</strong></div>
+              </div>
+              <div className="cost-breakdown" aria-label="持有期成本构成">
+                <div className="cost-breakdown-head"><span>持有期成本构成</span><strong>{formatPrice(ownershipTotal)}</strong></div>
+                {costBreakdown.map((item) => (
+                  <div className="cost-breakdown-row" key={item.key}>
+                    <div><span>{item.label}</span><strong>{formatPrice(item.amount)}</strong></div>
+                    <div className="cost-track" aria-hidden="true"><span className={`cost-fill ${item.key}`} style={{ width: `${Math.max(2, (item.amount / Math.max(ownershipTotal, 1)) * 100)}%` }} /></div>
+                  </div>
+                ))}
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <details className="calculator-details calculator-support">
+          <summary>查看一次性清单、月费用明细与计算口径</summary>
+          <div className="cost-checklist calculator-details-body">
+            <section>
+              <p className="eyebrow">Upfront cost</p>
+              <h3>一次性落地清单</h3>
+              <div className="fee-list">
+                {upfrontFeeItems.map((item) => (
+                  <div className="fee-row" key={item.label}>
+                    <div><strong>{item.label}</strong><small>{item.note}</small></div>
+                    <span>{formatPrice(item.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section>
+              <p className="eyebrow">Monthly cost</p>
+              <h3>每月持有清单</h3>
+              <div className="fee-list">
+                {ownershipMonthlyFeeItems.map((item) => (
+                  <div className="fee-row" key={item.label}>
+                    <div><strong>{item.label}</strong><small>{item.note}</small></div>
+                    <span>{formatPrice(item.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section className="formula-card">
+              <p className="eyebrow">Formula</p>
+              <h3>计算口径</h3>
+              <p>等额本息：月供 = 本金 × 月利率 × (1 + 月利率)^期数 ÷ [(1 + 月利率)^期数 - 1]。</p>
+              <p>等额本金：每月偿还固定本金，利息按剩余本金递减。免息分期：贷款本金 ÷ 分期期数。</p>
+              <p>购置税估算：含税成交价先按增值税折算率还原为不含税计税价，再按所选税收口径估算。BaaS 月租作为长期月度成本单独展示。</p>
+              <p>综合年化融资成本采用 IRR 复利口径，默认把金融服务费视为放款当期由借款人承担的贷款相关费用。<a href="https://xining.pbc.gov.cn/goutongjiaoliu/113456/113469/2025092212551432728/index.html" target="_blank" rel="noreferrer">查看中国人民银行口径 →</a></p>
+            </section>
+          </div>
+        </details>
 
         <div className="bill-library">
           <section className="library-panel">
