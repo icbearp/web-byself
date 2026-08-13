@@ -60,7 +60,8 @@ test("keeps the primary navigation fixed and the buyer journey interactive", asy
   assert.match(pageSource, /aria-label="横向浏览买车阶段"/);
   assert.match(pageSource, /aria-pressed=\{selectedStage === item\.key\}/);
   assert.match(pageSource, /个人无限公司，准备中/);
-  assert.match(pageSource, /直营没有消除利益差异/);
+  assert.match(pageSource, /短期先活下来，长期才有意义/);
+  assert.match(pageSource, /事实—影响—选项—请求—时间/);
 });
 
 test("separates loan finance, first payment, and ownership-cost inputs", async () => {
