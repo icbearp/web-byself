@@ -155,7 +155,7 @@ type SavedFinanceBill = {
 
 const workspaceTabs: Array<{ key: WorkspaceKey; label: string; description: string }> = [
   { key: "home", label: "首页", description: "认识周多福与四个长期栏目" },
-  { key: "records", label: "每日记录", description: "按日期、标签和购车阶段回看" },
+  { key: "records", label: "随心记录", description: "不追求日更，记录值得留下的判断" },
   { key: "car", label: "购车与车型", description: "乐道车型、家庭场景与官方信息" },
   { key: "finance", label: "金融计算", description: "落地成本、月供、BaaS 与账单" },
   { key: "life", label: "效率生活", description: "职场成长、效率方法与业余沉淀" },
@@ -221,13 +221,31 @@ const recordCollections: Array<{
 
 const dailyRecords: DailyRecord[] = [
   {
+    id: "2026-08-13-direct-sales-boundaries",
+    date: "2026-08-13",
+    category: "career-growth",
+    stage: "order",
+    tags: ["#直营模式", "#销售边界", "#个人标准", "#个人无限公司"],
+    title: "直营没有消除利益差异，只是把矛盾推到了更靠近用户的地方",
+    paragraphs: [
+      "最近开了一个单子，也让我重新思考用户、企业和一线销售之间的关系。用户希望价格更合适、权益更多、服务更充分；企业则必须守住成本、规则和经营底线。两边都没有错，这本来就是商业关系里长期存在的拉力。",
+      "直营模式减少了传统经销环节，却没有消除利益差异。用户面对的不再是层层渠道，而是直接面对品牌；品牌的规则、价格和边界，也通过一线 Fellow 直接抵达用户。于是很多原本属于商业机制的矛盾，最后都集中到了离用户最近的人身上。",
+      "如果缺少清晰的角色认知，Fellow 很容易变成两头受累的人：对用户，担心给得不够；对公司，又担心越过底线。可真正的问题不是谁受了委屈，而是能不能把公司规则、用户需求和自己的承诺分开，不把所有冲突都变成个人情绪和无限责任。",
+      "我的角色不应该是无条件替任何一方争取，也不是替任何一方辩护。我更应该做的是把信息说清楚，把能争取与不能承诺的边界讲明白，判断双方是否真正匹配，并在合适的节奏里推进决定。交易不是谁压过谁，而是彼此确认这是不是一段值得开始的关系。",
+      "我希望遇到更精准、高质量的用户。这里的高质量不是消费能力更高，而是需求相对清楚、愿意沟通、尊重边界，也看得见专业服务的价值。用户越精准，我越能把时间和精力投入到真正有帮助的地方，服务也会更细、更快、更有持续动力。",
+      "所以接下来要建立自己的标准：什么必须坦诚说明，什么绝不随意承诺，什么样的节奏值得长期跟进，什么样的关系需要及时停止消耗。标准不是为了摆高姿态，而是让合作双方都被认真对待。",
+      "不放低姿态，也不抬高自己；把心态放平，把事情做好。一次成交只是结果，真正需要积累的是判断、信誉、筛选能力和长期服务的节奏。把自己当作一家公司来经营，每一次沟通都在塑造产品，每一次取舍都在建立品牌。个人无限公司，准备中。",
+    ],
+    takeaway: "不靠讨好换成交，不把机制矛盾变成个人内耗；用清晰标准筛选彼此适合的用户，用平等、专业和稳定节奏提供长期服务。",
+  },
+  {
     id: "2026-07-29-content-collections",
     date: "2026-07-29",
     category: "career-growth",
     tags: ["#网站整理", "#内容集合", "#长期积累"],
     title: "内容不是越堆越多，而是要慢慢长成清晰的集合",
     paragraphs: [
-      "今天重新看这个独立站，我意识到每日记录不能只是往下堆。前两篇记录一多，页面就会变长；以后如果持续更新几十篇、上百篇，访客反而更难找到真正需要的内容。",
+      "今天重新看这个独立站，我意识到随心记录不能只是往下堆。前两篇记录一多，页面就会变长；以后如果持续更新几十篇、上百篇，访客反而更难找到真正需要的内容。",
       "所以网站需要从“流水账”变成“内容集合”：按日期能回看当天记录，按话题能看同一类经验，按买车阶段能直接进入当前最相关的问题。这样首页保持简洁，但内容不会被折叠到没人看见。",
       "这件事也很像做用户服务。用户不需要我把所有信息一次性倒给他，而是需要在合适的阶段看到合适的内容。好的整理，本质上是在降低对方理解和决策的成本。",
     ],
@@ -829,7 +847,7 @@ export default function Home() {
   const [homeView, setHomeView] = useState<HomeViewKey>("about");
   const [selectedRecordCategory, setSelectedRecordCategory] = useState<RecordCategoryKey | "all">("all");
   const [selectedStage, setSelectedStage] = useState<StageKey | "all">("all");
-  const [selectedDailyId, setSelectedDailyId] = useState("2026-07-29-content-collections");
+  const [selectedDailyId, setSelectedDailyId] = useState("2026-08-13-direct-sales-boundaries");
   const [selectedColumn, setSelectedColumn] = useState<ColumnKey | "all">("all");
   const [articleQuery, setArticleQuery] = useState("");
   const [expandedArticle, setExpandedArticle] = useState<string | null>("car-fit");
@@ -1368,13 +1386,13 @@ export default function Home() {
       {activeWorkspace === "records" && <section className="section daily-record-section" id="daily-record">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Daily record</p>
-            <h2>今天的记录，先写成可以反复引用的一段话。</h2>
+            <p className="eyebrow">Open notes</p>
+            <h2>把值得留下的想法，写成可以反复引用的判断。</h2>
           </div>
-          <p className="section-lead">日期、标签、观点和购车阶段，一次整理清楚，后面就能持续积累。</p>
+          <p className="section-lead">不要求日更，也不为了凑数；有真实经历、有新判断时再写下来。</p>
         </div>
 
-        <div className="record-collections" aria-label="每日记录集合分类">
+        <div className="record-collections" aria-label="随心记录集合分类">
           <button type="button" className={selectedRecordCategory === "all" ? "collection-card active" : "collection-card"} onClick={() => chooseRecordCategory("all")}>
             <span>全部记录</span>
             <strong>按日期回看所有沉淀</strong>
@@ -1390,7 +1408,7 @@ export default function Home() {
         </div>
 
         <div className="daily-layout">
-          <aside className="record-browser" aria-label="按日期选择每日记录">
+          <aside className="record-browser" aria-label="按日期选择随心记录">
             <div className="browser-head">
               <p className="eyebrow">Records</p>
               <h3>按日期阅读</h3>

@@ -34,7 +34,7 @@ test("server-renders the structured personal homepage", async () => {
   assert.match(html, /关于我/);
   assert.match(html, /内容专栏/);
   assert.match(html, /服务范围/);
-  assert.match(html, /每日记录/);
+  assert.match(html, /随心记录/);
   assert.match(html, /购车与车型/);
   assert.match(html, /金融计算/);
   assert.match(html, /效率生活/);
@@ -59,6 +59,8 @@ test("keeps the primary navigation fixed and the buyer journey interactive", asy
   assert.match(styles, /\.journey-list\s*\{[\s\S]*?grid-template-columns:\s*repeat\(10,/);
   assert.match(pageSource, /aria-label="横向浏览买车阶段"/);
   assert.match(pageSource, /aria-pressed=\{selectedStage === item\.key\}/);
+  assert.match(pageSource, /个人无限公司，准备中/);
+  assert.match(pageSource, /直营没有消除利益差异/);
 });
 
 test("separates loan finance, first payment, and ownership-cost inputs", async () => {
