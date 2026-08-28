@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const feedback = sqliteTable("feedback", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -42,3 +42,23 @@ export const siteStats = sqliteTable("site_stats", {
   value: integer("value").notNull().default(0),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const comments = sqliteTable("comments", {
+  id: text("id").primaryKey(),
+  contentType: text("content_type").notNull(),
+  contentId: text("content_id").notNull(),
+  contentTitle: text("content_title").notNull(),
+  category: text("category").notNull().default("question"),
+  message: text("message").notNull(),
+  authorName: text("author_name").notNull().default("匿名读者"),
+  anchorText: text("anchor_text").notNull().default(""),
+  anchorBlock: text("anchor_block").notNull().default(""),
+  parentId: text("parent_id"),
+  userId: text("user_id").references(() => users.id),
+  status: text("status").notNull().default("pending"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  index("idx_comments_content_status_created").on(table.contentType, table.contentId, table.status, table.createdAt),
+  index("idx_comments_parent_id").on(table.parentId),
+]);

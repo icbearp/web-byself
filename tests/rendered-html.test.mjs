@@ -113,6 +113,31 @@ test("includes maintainable tutorials, records, drafts, visit statistics, and th
   assert.equal(JSON.parse(records).length, 3);
 });
 
+test("supports anchored article discussions, moderation, and editorial interaction styling", async () => {
+  const [pageSource, styles, schema, commentsRoute, adminCommentsRoute, migration] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/comments/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/admin/comments/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0003_cool_garia.sql", import.meta.url), "utf8"),
+  ]);
+  assert.match(pageSource, /批注这段/);
+  assert.match(pageSource, /讨论与批注/);
+  assert.match(pageSource, /contentType="tutorial"/);
+  assert.match(pageSource, /contentType="record"/);
+  assert.match(pageSource, /contentType="article"/);
+  assert.match(pageSource, /回复并公开/);
+  assert.match(styles, /\.content-discussion/);
+  assert.match(styles, /"Songti SC"/);
+  assert.match(styles, /\.workspace-nav\s*\{/);
+  assert.match(schema, /idx_comments_content_status_created/);
+  assert.match(commentsRoute, /reviewRequired/);
+  assert.match(adminCommentsRoute, /status === "published"/);
+  assert.match(migration, /CREATE TABLE `comments`/);
+  assert.match(migration, /PRAGMA optimize/);
+});
+
 test("supports guided accounts, cloud bills, and a private admin inbox", async () => {
   const [pageSource, authSource, billSource, adminSource] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),

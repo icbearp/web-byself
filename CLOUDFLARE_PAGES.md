@@ -50,6 +50,7 @@ git push origin main
 - 密码只保存 PBKDF2 派生结果和随机盐，不保存明文密码。
 - 登录凭证使用 `HttpOnly`、`Secure`、`SameSite=Lax` Cookie，并在服务器端保存其哈希值。
 - 普通用户只能查看和删除自己的账单；管理员可以查看用户主动保存的账单及提交的留言。
+- 教程、随心记录与专栏文章支持带正文引用的留言；普通留言审核后公开，管理员回复会直接公开。对应结构位于 `drizzle/0003_cool_garia.sql`。
 - 第一版暂不包含邮箱验证、找回密码和整账户注销；这些功能需要邮件服务后再启用。
 
 Cloudflare 官方说明：Pages Functions 可以通过 Dashboard 或 Wrangler 配置 D1 绑定，绑定生效后必须重新部署项目。

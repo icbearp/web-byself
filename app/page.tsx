@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import tutorialsData from "../content/tutorials.json";
 import changelogData from "../content/changelog.json";
 import publishedRecordsData from "../content/records.json";
@@ -20,6 +20,22 @@ type FeedbackType = "suggestion" | "question" | "experience";
 type AuthUser = { id: string; email: string; role: string };
 type AdminFeedbackItem = { id: number; type: string; message: string; contact: string; page: string; status: string; createdAt: string; userEmail?: string | null };
 type AdminBillItem = { id: string; title: string; createdAt: string; userEmail?: string | null; snapshot: FinanceBillSnapshot };
+type ContentComment = {
+  id: string;
+  contentType: "tutorial" | "record" | "article";
+  contentId: string;
+  contentTitle: string;
+  category: string;
+  message: string;
+  authorName: string;
+  anchorText: string;
+  anchorBlock: string;
+  parentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  status?: string;
+};
+type AdminCommentItem = ContentComment & { userId?: string | null; status: string };
 
 type Column = {
   key: ColumnKey;
@@ -533,22 +549,219 @@ function TutorialBody({ content }: { content: string }) {
         rows.push(parseRow(lines[index] ?? ""));
         index += 1;
       }
-      blocks.push(<div className="tutorial-table-wrap" key={key}><table><thead><tr>{headers.map((header, cellIndex) => <th key={`${header}-${cellIndex}`}>{renderInlineMarkdown(header)}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex}>{renderInlineMarkdown(row[cellIndex] ?? "")}</td>)}</tr>)}</tbody></table></div>);
+      blocks.push(<div className="tutorial-table-wrap" data-comment-block={`line-${index}`} key={key}><table><thead><tr>{headers.map((header, cellIndex) => <th key={`${header}-${cellIndex}`}>{renderInlineMarkdown(header)}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex}>{renderInlineMarkdown(row[cellIndex] ?? "")}</td>)}</tr>)}</tbody></table></div>);
       continue;
     }
 
     if (!line.trim()) blocks.push(<span className="tutorial-space" key={key} />);
-    else if (image) blocks.push(<figure className="tutorial-image" key={key}><img src={image[2]} alt={image[1]} loading="lazy" />{image[1] && <figcaption>{image[1]}</figcaption>}</figure>);
-    else if (line.startsWith("## ")) blocks.push(<h3 key={key}>{renderInlineMarkdown(line.slice(3))}</h3>);
-    else if (line.startsWith("### ")) blocks.push(<h4 key={key}>{renderInlineMarkdown(line.slice(4))}</h4>);
-    else if (line.startsWith("- ")) blocks.push(<p className="tutorial-list-line" key={key}>• {renderInlineMarkdown(line.slice(2))}</p>);
-    else if (/^\d+\.\s/.test(line)) blocks.push(<p className="tutorial-list-line ordered" key={key}>{renderInlineMarkdown(line)}</p>);
-    else if (line.startsWith("> ")) blocks.push(<blockquote key={key}>{renderInlineMarkdown(line.slice(2))}</blockquote>);
-    else blocks.push(<p key={key}>{renderInlineMarkdown(line)}</p>);
+    else if (image) blocks.push(<figure className="tutorial-image" data-comment-block={`line-${index}`} key={key}><img src={image[2]} alt={image[1]} loading="lazy" />{image[1] && <figcaption>{image[1]}</figcaption>}</figure>);
+    else if (line.startsWith("## ")) blocks.push(<h3 data-comment-block={`line-${index}`} key={key}>{renderInlineMarkdown(line.slice(3))}</h3>);
+    else if (line.startsWith("### ")) blocks.push(<h4 data-comment-block={`line-${index}`} key={key}>{renderInlineMarkdown(line.slice(4))}</h4>);
+    else if (line.startsWith("- ")) blocks.push(<p className="tutorial-list-line" data-comment-block={`line-${index}`} key={key}>• {renderInlineMarkdown(line.slice(2))}</p>);
+    else if (/^\d+\.\s/.test(line)) blocks.push(<p className="tutorial-list-line ordered" data-comment-block={`line-${index}`} key={key}>{renderInlineMarkdown(line)}</p>);
+    else if (line.startsWith("> ")) blocks.push(<blockquote data-comment-block={`line-${index}`} key={key}>{renderInlineMarkdown(line.slice(2))}</blockquote>);
+    else blocks.push(<p data-comment-block={`line-${index}`} key={key}>{renderInlineMarkdown(line)}</p>);
     index += 1;
   }
 
   return <div className="tutorial-body">{blocks}</div>;
+}
+
+const commentCategoryLabels: Record<string, string> = {
+  question: "提问",
+  correction: "纠错",
+  addition: "补充",
+  experience: "经验",
+  suggestion: "建议",
+  reply: "回复",
+};
+
+function ContentDiscussion({
+  contentType,
+  contentId,
+  contentTitle,
+  authUser,
+  children,
+}: {
+  contentType: ContentComment["contentType"];
+  contentId: string;
+  contentTitle: string;
+  authUser: AuthUser | null;
+  children: ReactNode;
+}) {
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [comments, setComments] = useState<ContentComment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [category, setCategory] = useState("question");
+  const [message, setMessage] = useState("");
+  const [authorName, setAuthorName] = useState("");
+  const [anchorText, setAnchorText] = useState("");
+  const [anchorBlock, setAnchorBlock] = useState("");
+  const [replyTo, setReplyTo] = useState<ContentComment | null>(null);
+  const [website, setWebsite] = useState("");
+  const [submitState, setSubmitState] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [submitText, setSubmitText] = useState("");
+  const [selectionPoint, setSelectionPoint] = useState<{ left: number; top: number } | null>(null);
+
+  const loadComments = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const response = await fetch(`/api/comments?contentType=${encodeURIComponent(contentType)}&contentId=${encodeURIComponent(contentId)}`);
+      const payload = (await response.json()) as { comments?: ContentComment[]; error?: string };
+      if (!response.ok) throw new Error(payload.error || "讨论暂时无法读取。");
+      setComments(payload.comments ?? []);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "讨论暂时无法读取。");
+    } finally {
+      setLoading(false);
+    }
+  }, [contentType, contentId]);
+
+  useEffect(() => {
+    const initialRequest = window.setTimeout(() => void loadComments(), 0);
+    const reload = () => void loadComments();
+    window.addEventListener("content-comment-updated", reload);
+    return () => {
+      window.clearTimeout(initialRequest);
+      window.removeEventListener("content-comment-updated", reload);
+    };
+  }, [loadComments]);
+
+  useEffect(() => {
+    const clearSelectionAction = () => setSelectionPoint(null);
+    window.addEventListener("scroll", clearSelectionAction, true);
+    return () => window.removeEventListener("scroll", clearSelectionAction, true);
+  }, []);
+
+  function captureSelection() {
+    window.setTimeout(() => {
+      const selection = window.getSelection();
+      const surface = surfaceRef.current;
+      if (!selection || selection.isCollapsed || !surface || selection.rangeCount === 0) {
+        setSelectionPoint(null);
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      const node = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+        ? range.commonAncestorContainer as Element
+        : range.commonAncestorContainer.parentElement;
+      if (!node || !surface.contains(node)) {
+        setSelectionPoint(null);
+        return;
+      }
+      const quote = selection.toString().trim().replace(/\s+/g, " ").slice(0, 360);
+      if (quote.length < 2) {
+        setSelectionPoint(null);
+        return;
+      }
+      const block = node.closest("[data-comment-block]") as HTMLElement | null;
+      const rect = range.getBoundingClientRect();
+      setAnchorText(quote);
+      setAnchorBlock(block?.dataset.commentBlock ?? "selected-text");
+      setSelectionPoint({
+        left: Math.min(window.innerWidth - 132, Math.max(12, rect.left + rect.width / 2 - 58)),
+        top: Math.max(12, rect.top - 48),
+      });
+    }, 0);
+  }
+
+  function startAnnotation() {
+    setSelectionPoint(null);
+    setReplyTo(null);
+    window.getSelection()?.removeAllRanges();
+    window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 20);
+  }
+
+  function startReply(comment: ContentComment) {
+    setReplyTo(comment);
+    setAnchorText("");
+    setAnchorBlock("");
+    setCategory("reply");
+    window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 20);
+  }
+
+  async function submitComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitState("sending");
+    setSubmitText("");
+    try {
+      const response = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ contentType, contentId, contentTitle, category, message, authorName, anchorText, anchorBlock, parentId: replyTo?.id, website }),
+      });
+      const payload = (await response.json()) as { error?: string; reviewRequired?: boolean };
+      if (!response.ok) throw new Error(payload.error || "留言没有提交成功。");
+      setMessage("");
+      setAnchorText("");
+      setAnchorBlock("");
+      setReplyTo(null);
+      setCategory("question");
+      setSubmitState("success");
+      setSubmitText(payload.reviewRequired ? "已提交。审核公开后，会出现在这篇内容的讨论中。" : "回复已公开。感谢你让这篇内容更完整。 ");
+      if (!payload.reviewRequired) await loadComments();
+      window.dispatchEvent(new CustomEvent("content-comment-updated"));
+    } catch (error) {
+      setSubmitState("error");
+      setSubmitText(error instanceof Error ? error.message : "留言没有提交成功。");
+    }
+  }
+
+  const rootComments = comments.filter((comment) => !comment.parentId);
+  const repliesFor = (id: string) => comments.filter((comment) => comment.parentId === id);
+
+  return <>
+    <div className="commentable-surface" ref={surfaceRef} onPointerUp={captureSelection}>{children}</div>
+    {selectionPoint && <button className="selection-comment-button" type="button" style={{ left: selectionPoint.left, top: selectionPoint.top }} onClick={startAnnotation}>＋ 批注这段</button>}
+    <section className="content-discussion" aria-label={`${contentTitle}的讨论与批注`}>
+      <div className="discussion-heading">
+        <div><span>Discussion</span><h3>讨论与批注</h3><p>选中正文即可引用提问，也可以直接留下补充、纠错或经验。</p></div>
+        <strong>{comments.length}<small> 条公开互动</small></strong>
+      </div>
+
+      {comments.length > 0 && <div className="comment-rail" aria-label="横向浏览最新互动">
+        {comments.slice().reverse().map((comment) => <button type="button" key={`rail-${comment.id}`} onClick={() => document.getElementById(`comment-${comment.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+          <span>{commentCategoryLabels[comment.category] ?? "互动"} · {comment.authorName}</span>
+          <strong>{comment.anchorText ? `“${comment.anchorText}”` : comment.message}</strong>
+        </button>)}
+      </div>}
+
+      <div className="discussion-body">
+        <div className="comment-thread-list">
+          {loading && <p className="discussion-empty">正在读取讨论…</p>}
+          {!loading && loadError && <p className="discussion-empty error">{loadError}</p>}
+          {!loading && !loadError && rootComments.length === 0 && <p className="discussion-empty">暂时还没有公开讨论。你可以成为第一个留下具体问题的人。</p>}
+          {rootComments.map((comment) => <article className="comment-thread" id={`comment-${comment.id}`} key={comment.id}>
+            <div className="comment-meta"><span>{commentCategoryLabels[comment.category] ?? "互动"}</span><strong>{comment.authorName}</strong><time>{comment.createdAt.replace("T", " ").slice(0, 16)}</time></div>
+            {comment.anchorText && <blockquote><small>引用自本文</small>“{comment.anchorText}”</blockquote>}
+            <p>{comment.message}</p>
+            <button className="comment-reply-button" type="button" onClick={() => startReply(comment)}>回复这条</button>
+            {repliesFor(comment.id).map((reply) => <div className="comment-reply" id={`comment-${reply.id}`} key={reply.id}>
+              <div className="comment-meta"><span>回复</span><strong>{reply.authorName}</strong><time>{reply.createdAt.replace("T", " ").slice(0, 16)}</time></div>
+              <p>{reply.message}</p>
+            </div>)}
+          </article>)}
+        </div>
+
+        <form className="comment-form" ref={formRef} onSubmit={submitComment}>
+          <div className="comment-form-head"><span>{replyTo ? `回复 ${replyTo.authorName}` : anchorText ? "正在引用正文" : "留下问题或补充"}</span>{(replyTo || anchorText) && <button type="button" onClick={() => { setReplyTo(null); setAnchorText(""); setAnchorBlock(""); setCategory("question"); }}>取消引用</button>}</div>
+          {replyTo && <blockquote>“{replyTo.message.slice(0, 120)}”</blockquote>}
+          {!replyTo && anchorText && <blockquote>“{anchorText}”</blockquote>}
+          <div className="comment-form-grid">
+            <label><span>互动类型</span><select value={category} onChange={(event) => setCategory(event.target.value)} disabled={Boolean(replyTo)}><option value="question">提问</option><option value="correction">纠错</option><option value="addition">补充</option><option value="experience">经验</option><option value="suggestion">建议</option>{replyTo && <option value="reply">回复</option>}</select></label>
+            {authUser?.role !== "admin" && <label><span>显示昵称（选填）</span><input maxLength={40} value={authorName} onChange={(event) => setAuthorName(event.target.value)} placeholder={authUser ? "默认显示为注册读者" : "默认显示为匿名读者"} /></label>}
+          </div>
+          <label><span>内容</span><textarea required minLength={2} maxLength={2000} rows={4} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="写下具体问题、补充依据，或说明你在哪一步遇到了困难。" /></label>
+          <label className="feedback-honeypot" aria-hidden="true">网站<input tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} /></label>
+          <div className="comment-form-actions"><small>{authUser?.role === "admin" ? "站主回复会直接公开。" : "提交后先由站主审核，避免广告与无关内容。"}</small><button type="submit" disabled={submitState === "sending"}>{submitState === "sending" ? "正在提交…" : replyTo ? "提交回复" : anchorText ? "提交批注" : "提交留言"}</button></div>
+          {submitText && <p className={`comment-submit-status ${submitState}`}>{submitText}</p>}
+        </form>
+      </div>
+    </section>
+  </>;
 }
 
 function buildCsv(snapshot: FinanceBillSnapshot) {
@@ -770,6 +983,8 @@ export default function Home() {
   const [billSaveStatus, setBillSaveStatus] = useState("");
   const [adminFeedbackItems, setAdminFeedbackItems] = useState<AdminFeedbackItem[]>([]);
   const [adminBillItems, setAdminBillItems] = useState<AdminBillItem[]>([]);
+  const [adminCommentItems, setAdminCommentItems] = useState<AdminCommentItem[]>([]);
+  const [adminReplyDrafts, setAdminReplyDrafts] = useState<Record<string, string>>({});
   const [adminInboxOpen, setAdminInboxOpen] = useState(false);
 
   const filteredArticles = useMemo(() => {
@@ -1150,18 +1365,58 @@ export default function Home() {
 
   async function loadAdminInbox() {
     try {
-      const [feedbackResponse, billsResponse] = await Promise.all([fetch("/api/admin/feedback"), fetch("/api/admin/bills")]);
+      const [feedbackResponse, billsResponse, commentsResponse] = await Promise.all([fetch("/api/admin/feedback"), fetch("/api/admin/bills"), fetch("/api/admin/comments")]);
       const feedbackPayload = (await feedbackResponse.json()) as { feedback?: AdminFeedbackItem[]; error?: string };
       const billsPayload = (await billsResponse.json()) as { bills?: AdminBillItem[]; error?: string };
+      const commentsPayload = (await commentsResponse.json()) as { comments?: AdminCommentItem[]; error?: string };
       if (!feedbackResponse.ok) throw new Error(feedbackPayload.error || "留言暂时无法读取。");
       if (!billsResponse.ok) throw new Error(billsPayload.error || "账单暂时无法读取。");
+      if (!commentsResponse.ok) throw new Error(commentsPayload.error || "文章讨论暂时无法读取。");
       setAdminFeedbackItems(feedbackPayload.feedback ?? []);
       setAdminBillItems(billsPayload.bills ?? []);
+      setAdminCommentItems(commentsPayload.comments ?? []);
       setAdminInboxOpen(true);
     } catch (error) {
       setFeedbackStatus("error");
       setFeedbackStatusText(error instanceof Error ? error.message : "管理员收件箱暂时无法读取。");
     }
+  }
+
+  async function updateAdminCommentStatus(id: string, status: "published" | "hidden") {
+    const response = await fetch("/api/admin/comments", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, status }) });
+    const payload = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setFeedbackStatus("error");
+      setFeedbackStatusText(payload.error || "文章留言状态暂时无法更新。");
+      return;
+    }
+    await loadAdminInbox();
+    window.dispatchEvent(new CustomEvent("content-comment-updated"));
+  }
+
+  async function replyToAdminComment(item: AdminCommentItem) {
+    const message = adminReplyDrafts[item.id]?.trim() ?? "";
+    if (message.length < 2) {
+      setFeedbackStatus("error");
+      setFeedbackStatusText("请先写下至少两个字的回复。");
+      return;
+    }
+    const response = await fetch("/api/comments", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ contentType: item.contentType, contentId: item.contentId, contentTitle: item.contentTitle, category: "reply", message, parentId: item.parentId || item.id }),
+    });
+    const payload = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setFeedbackStatus("error");
+      setFeedbackStatusText(payload.error || "回复暂时没有提交成功。");
+      return;
+    }
+    setAdminReplyDrafts((current) => ({ ...current, [item.id]: "" }));
+    setFeedbackStatus("success");
+    setFeedbackStatusText("回复已公开，并保留了原留言的引用关系。");
+    await loadAdminInbox();
+    window.dispatchEvent(new CustomEvent("content-comment-updated"));
   }
 
   async function submitFeedback(event: FormEvent<HTMLFormElement>) {
@@ -1278,19 +1533,21 @@ export default function Home() {
                 <button type="button" key={tag} onClick={() => setSelectedDailyId(selectedDailyRecord.id)}>{tag}</button>
               ))}
             </div>
-            {selectedDailyRecord.content
-              ? <TutorialBody content={selectedDailyRecord.content} />
-              : selectedDailyRecord.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-            {selectedDailyRecord.sources && (
-              <div className="record-sources" aria-label="资料来源">
-                <span>资料来源与核验</span>
-                {selectedDailyRecord.sources.map((source) => <a key={source.href} href={source.href} target="_blank" rel="noreferrer">{source.label} ↗</a>)}
+            <ContentDiscussion key={selectedDailyRecord.id} contentType="record" contentId={selectedDailyRecord.id} contentTitle={selectedDailyRecord.title} authUser={authUser}>
+              {selectedDailyRecord.content
+                ? <TutorialBody content={selectedDailyRecord.content} />
+                : selectedDailyRecord.paragraphs.map((paragraph, paragraphIndex) => <p data-comment-block={`paragraph-${paragraphIndex}`} key={paragraph}>{paragraph}</p>)}
+              {selectedDailyRecord.sources && (
+                <div className="record-sources" data-comment-block="sources" aria-label="资料来源">
+                  <span>资料来源与核验</span>
+                  {selectedDailyRecord.sources.map((source) => <a key={source.href} href={source.href} target="_blank" rel="noreferrer">{source.label} ↗</a>)}
+                </div>
+              )}
+              <div className="daily-takeaway" data-comment-block="takeaway">
+                <span>记录结论</span>
+                <strong>{selectedDailyRecord.takeaway}</strong>
               </div>
-            )}
-            <div className="daily-takeaway">
-              <span>记录结论</span>
-              <strong>{selectedDailyRecord.takeaway}</strong>
-            </div>
+            </ContentDiscussion>
           </article>
 
         </div>
@@ -1350,8 +1607,10 @@ export default function Home() {
           {selectedTutorial && <article className="tutorial-reader">
             <div className="tutorial-reader-head"><span>{selectedTutorial.category}</span><time>更新于 {selectedTutorial.updatedAt}</time></div>
             <h2>{selectedTutorial.title}</h2><p className="tutorial-summary">{selectedTutorial.summary}</p>
-            <TutorialBody content={selectedTutorial.content} />
-            {selectedTutorial.sources.length > 0 && <div className="tutorial-sources"><strong>资料来源</strong>{selectedTutorial.sources.map((source) => <a href={source.href} key={source.href} target="_blank" rel="noreferrer">{source.label} ↗</a>)}</div>}
+            <ContentDiscussion key={selectedTutorial.id} contentType="tutorial" contentId={selectedTutorial.id} contentTitle={selectedTutorial.title} authUser={authUser}>
+              <TutorialBody content={selectedTutorial.content} />
+              {selectedTutorial.sources.length > 0 && <div className="tutorial-sources" data-comment-block="sources"><strong>资料来源</strong>{selectedTutorial.sources.map((source) => <a href={source.href} key={source.href} target="_blank" rel="noreferrer">{source.label} ↗</a>)}</div>}
+            </ContentDiscussion>
           </article>}
         </div>
         <details className="changelog-panel"><summary>查看教程更新日志</summary><div>{changelog.map((item) => <article key={`${item.date}-${item.title}`}><time>{item.date}</time><strong>{item.title}</strong><p>{item.detail}</p></article>)}</div></details>
@@ -1360,7 +1619,7 @@ export default function Home() {
       <section className="section article-section" id="articles">
         <div className="section-heading"><div><p className="eyebrow">Column answers</p><h2>从一个问题开始，读一篇能带走的回答。</h2></div><div className="article-tools"><label className="search-field"><span>搜索专栏</span><input type="search" placeholder="输入关键词" value={articleQuery} onChange={(event) => setArticleQuery(event.target.value)} /></label><button type="button" className={selectedColumn === "all" ? "filter-chip active" : "filter-chip"} onClick={() => setSelectedColumn("all")}>全部</button></div></div>
         <div className="article-filter">{columns.map((column) => <button type="button" className={selectedColumn === column.key ? "filter-chip active" : "filter-chip"} key={column.key} onClick={() => setSelectedColumn(column.key)}>{column.label}</button>)}</div>
-        <div className="article-list">{filteredArticles.map((article) => { const column = columns.find((item) => item.key === article.column)!; const isOpen = expandedArticle === article.id; return <article className={isOpen ? "article-row open" : "article-row"} key={article.id}><div className="article-row-main"><div><span className="article-label">{column.label}</span><h3>{article.title}</h3><p>{article.excerpt}</p></div><button type="button" className="icon-button" aria-label={isOpen ? "收起文章" : "展开文章"} onClick={() => setExpandedArticle(isOpen ? null : article.id)}>{isOpen ? "−" : "+"}</button></div>{isOpen && <div className="article-body"><p>{article.body}</p><ul>{article.points.map((point) => <li key={point}>{point}</li>)}</ul></div>}</article> })}</div>
+        <div className="article-list">{filteredArticles.map((article) => { const column = columns.find((item) => item.key === article.column)!; const isOpen = expandedArticle === article.id; return <article className={isOpen ? "article-row open" : "article-row"} key={article.id}><div className="article-row-main"><div><span className="article-label">{column.label}</span><h3>{article.title}</h3><p>{article.excerpt}</p></div><button type="button" className="icon-button" aria-label={isOpen ? "收起文章" : "展开文章"} onClick={() => setExpandedArticle(isOpen ? null : article.id)}>{isOpen ? "−" : "+"}</button></div>{isOpen && <div className="article-body"><ContentDiscussion key={article.id} contentType="article" contentId={article.id} contentTitle={article.title} authUser={authUser}><p data-comment-block="answer">{article.body}</p><ul data-comment-block="points">{article.points.map((point) => <li key={point}>{point}</li>)}</ul></ContentDiscussion></div>}</article> })}</div>
         {filteredArticles.length === 0 && <p className="empty-state">暂时没有匹配的文章，换一个关键词试试。</p>}
       </section>
 
@@ -1415,7 +1674,7 @@ export default function Home() {
         </div>
         <div className="car-record-layout">
           <aside className="car-record-list">{carRecords.map((record) => <button type="button" className={selectedCarRecord.id === record.id ? "active" : ""} key={record.id} onClick={() => setSelectedCarRecordId(record.id)}><span>{record.date}</span><strong>{record.title}</strong></button>)}{carRecords.length === 0 && <p className="empty-state">这个阶段暂无记录，可先查看完整周期。</p>}</aside>
-          <article className="daily-entry car-daily-entry"><div className="daily-meta"><span>{selectedCarRecord.date}</span><span>{purchaseStages.find((stage) => stage.key === selectedCarRecord.stage)?.title ?? "汽车记录"}</span>{selectedCarRecord.updatedAt && <span>更新于 {selectedCarRecord.updatedAt}</span>}</div><h3>{selectedCarRecord.title}</h3>{selectedCarRecord.content ? <TutorialBody content={selectedCarRecord.content} /> : selectedCarRecord.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}<div className="daily-takeaway"><span>记录结论</span><strong>{selectedCarRecord.takeaway}</strong></div></article>
+          <article className="daily-entry car-daily-entry"><div className="daily-meta"><span>{selectedCarRecord.date}</span><span>{purchaseStages.find((stage) => stage.key === selectedCarRecord.stage)?.title ?? "汽车记录"}</span>{selectedCarRecord.updatedAt && <span>更新于 {selectedCarRecord.updatedAt}</span>}</div><h3>{selectedCarRecord.title}</h3><ContentDiscussion key={selectedCarRecord.id} contentType="record" contentId={selectedCarRecord.id} contentTitle={selectedCarRecord.title} authUser={authUser}>{selectedCarRecord.content ? <TutorialBody content={selectedCarRecord.content} /> : selectedCarRecord.paragraphs.map((paragraph, paragraphIndex) => <p data-comment-block={`paragraph-${paragraphIndex}`} key={paragraph}>{paragraph}</p>)}<div className="daily-takeaway" data-comment-block="takeaway"><span>记录结论</span><strong>{selectedCarRecord.takeaway}</strong></div></ContentDiscussion></article>
         </div>
       </section>
 
@@ -1813,13 +2072,29 @@ export default function Home() {
             <div className="admin-inbox-head">
               <div>
                 <p className="eyebrow">Admin inbox</p>
-                <h3 id="admin-inbox-heading">留言与用户账单</h3>
-                <p>只有管理员账户可以查看。账单仅展示用户主动保存到云端的内容。</p>
+                <h3 id="admin-inbox-heading">文章讨论、留言与用户账单</h3>
+                <p>文章讨论可以审核、隐藏并原位回复；账单仅展示用户主动保存到云端的内容。</p>
               </div>
               <button type="button" onClick={loadAdminInbox}>{adminInboxOpen ? "刷新收件箱" : "打开收件箱"}</button>
             </div>
             {adminInboxOpen && (
               <div className="admin-inbox-grid">
+                <section className="admin-comment-section">
+                  <div className="admin-list-title"><strong>文章讨论</strong><span>{adminCommentItems.length} 条</span></div>
+                  {adminCommentItems.length > 0 ? adminCommentItems.slice(0, 30).map((item) => (
+                    <article className="admin-inbox-item admin-comment-item" key={item.id}>
+                      <div><strong>{commentCategoryLabels[item.category] ?? "互动"} · {item.status === "pending" ? "待审核" : item.status === "published" ? "已公开" : "已隐藏"}</strong><time>{item.createdAt}</time></div>
+                      <small>{item.contentTitle} · {item.authorName}</small>
+                      {item.anchorText && <blockquote>“{item.anchorText}”</blockquote>}
+                      <p>{item.message}</p>
+                      <div className="admin-comment-actions">
+                        {item.status !== "published" && <button type="button" onClick={() => void updateAdminCommentStatus(item.id, "published")}>公开</button>}
+                        {item.status !== "hidden" && <button type="button" onClick={() => void updateAdminCommentStatus(item.id, "hidden")}>隐藏</button>}
+                      </div>
+                      {!item.parentId && <div className="admin-inline-reply"><textarea rows={2} value={adminReplyDrafts[item.id] ?? ""} onChange={(event) => setAdminReplyDrafts((current) => ({ ...current, [item.id]: event.target.value }))} placeholder={item.status === "published" ? "写下回复并公开到原文…" : "先公开原留言，再进行回复"} disabled={item.status !== "published"} /><button type="button" onClick={() => void replyToAdminComment(item)} disabled={item.status !== "published"}>回复并公开</button></div>}
+                    </article>
+                  )) : <p className="admin-empty">目前还没有文章讨论。</p>}
+                </section>
                 <section>
                   <div className="admin-list-title"><strong>最新留言</strong><span>{adminFeedbackItems.length} 条</span></div>
                   {adminFeedbackItems.length > 0 ? adminFeedbackItems.slice(0, 20).map((item) => (
@@ -1883,7 +2158,7 @@ export default function Home() {
                       <strong>注册前请确认</strong>
                       <ul>
                         <li>你主动保存的账单会存入云端，用于跨设备查看和继续计算。</li>
-                        <li>网站管理员可以查看账单摘要及你主动提交的留言，以便提供服务。</li>
+                        <li>网站管理员可以查看账单摘要及你主动提交的留言；文章批注经审核后会公开显示。</li>
                         <li>请不要在账单或留言中填写身份证、银行卡等不必要的敏感信息。</li>
                         <li>你可以随时删除自己的单份账单；账户注销功能将在后续版本提供。</li>
                       </ul>
