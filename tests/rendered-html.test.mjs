@@ -52,21 +52,22 @@ test("keeps generated lifestyle imagery local to the site", async () => {
 });
 
 test("keeps the primary navigation fixed and the buyer journey interactive", async () => {
-  const [pageSource, styles] = await Promise.all([
+  const [pageSource, styles, records] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../content/records.json", import.meta.url), "utf8"),
   ]);
 
   assert.match(styles, /\.site-header\s*\{[\s\S]*?position:\s*fixed;/);
   assert.match(styles, /\.journey-list\s*\{[\s\S]*?grid-template-columns:\s*repeat\(10,/);
   assert.match(pageSource, /aria-label="横向浏览买车阶段"/);
   assert.match(pageSource, /aria-pressed=\{selectedStage === item\.key\}/);
-  assert.match(pageSource, /个人无限公司/);
-  assert.match(pageSource, /短期先活下来，长期才有意义/);
-  assert.match(pageSource, /事实—影响—选项—请求—时间/);
-  assert.match(pageSource, /改变不了环境时，离开也是一种负责/);
-  assert.match(pageSource, /星宇股份/);
-  assert.match(pageSource, /特殊工时制度须申请并经批准后实施/);
+  assert.match(records, /个人无限公司/);
+  assert.match(records, /短期先活下来，长期才有意义/);
+  assert.match(records, /事实—影响—选项—请求—时间/);
+  assert.match(records, /改变不了环境时，离开也是一种负责/);
+  assert.match(records, /星宇股份/);
+  assert.match(records, /特殊工时制度须申请并经批准后实施/);
 });
 
 test("separates loan finance, first payment, and ownership-cost inputs", async () => {
@@ -107,8 +108,9 @@ test("includes maintainable tutorials, records, drafts, visit statistics, and th
   assert.match(publisherSource, /content\/records\.json/);
   assert.match(publisherHtml, /多维表格/);
   assert.match(publisherHtml, /图片链接/);
+  assert.match(publisherHtml, /isPublished\(\)\?'更新':'发布'/);
   assert.match(tutorials, /把零散网页整理成可追溯的内容库/);
-  assert.equal(JSON.parse(records).length, 0);
+  assert.equal(JSON.parse(records).length, 3);
 });
 
 test("supports guided accounts, cloud bills, and a private admin inbox", async () => {
