@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import tutorialsData from "../content/tutorials.json";
 import changelogData from "../content/changelog.json";
+import publishedRecordsData from "../content/records.json";
 import { calculateAnnualizedIrr } from "./finance-math";
 
 type PurchaseMode = "vehicle" | "baas";
@@ -65,6 +66,9 @@ type DailyRecord = {
   title: string;
   paragraphs: string[];
   takeaway: string;
+  content?: string;
+  publishedAt?: string;
+  updatedAt?: string;
   sources?: Array<{ label: string; href: string }>;
 };
 
@@ -213,7 +217,7 @@ const recordCollections: Array<{
   },
 ];
 
-const dailyRecords: DailyRecord[] = [
+const builtInDailyRecords: DailyRecord[] = [
   {
     id: "2026-08-28-leaving-is-also-a-choice",
     date: "2026-08-28",
@@ -302,6 +306,9 @@ const dailyRecords: DailyRecord[] = [
     takeaway: "买车时不只看当下的价格和续航，更要看未来几年能不能持续省钱、保值和升级。",
   },
 ];
+
+const dailyRecords: DailyRecord[] = [...(publishedRecordsData as DailyRecord[]), ...builtInDailyRecords]
+  .sort((first, second) => second.date.localeCompare(first.date));
 
 const purchaseStages: Array<{ key: StageKey; step: string; title: string; note: string }> = [
   { key: "plan", step: "01", title: "初买车打算", note: "先确认自己为什么要买车，是否真的需要换车或新增一台。" },
@@ -554,19 +561,52 @@ function downloadText(filename: string, content: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
+function renderInlineMarkdown(value: string): ReactNode[] {
+  const tokens = value.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)]+\))/g);
+  return tokens.filter(Boolean).map((token, index) => {
+    const link = token.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
+    if (link) return <a href={link[2]} key={`${index}-${token}`} target="_blank" rel="noreferrer">{link[1]} ↗</a>;
+    if (token.startsWith("**") && token.endsWith("**")) return <strong key={`${index}-${token}`}>{token.slice(2, -2)}</strong>;
+    return token;
+  });
+}
+
 function TutorialBody({ content }: { content: string }) {
-  return (
-    <div className="tutorial-body">
-      {content.split("\n").map((line, index) => {
-        const key = `${index}-${line.slice(0, 12)}`;
-        if (!line.trim()) return <span className="tutorial-space" key={key} />;
-        if (line.startsWith("## ")) return <h3 key={key}>{line.slice(3)}</h3>;
-        if (line.startsWith("### ")) return <h4 key={key}>{line.slice(4)}</h4>;
-        if (line.startsWith("- ")) return <p className="tutorial-list-line" key={key}>• {line.slice(2)}</p>;
-        return <p key={key}>{line}</p>;
-      })}
-    </div>
-  );
+  const lines = content.split("\n");
+  const blocks: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    const key = `${index}-${line.slice(0, 12)}`;
+    const image = line.match(/^!\[([^\]]*)\]\((https?:\/\/[^)]+)\)$/);
+    const hasTableHeader = line.includes("|") && /^\s*\|?[\s:|-]+\|[\s:|-]+/.test(lines[index + 1] ?? "");
+
+    if (hasTableHeader) {
+      const parseRow = (row: string) => row.replace(/^\s*\||\|\s*$/g, "").split("|").map((cell) => cell.trim());
+      const headers = parseRow(line);
+      const rows: string[][] = [];
+      index += 2;
+      while (index < lines.length && (lines[index] ?? "").includes("|")) {
+        rows.push(parseRow(lines[index] ?? ""));
+        index += 1;
+      }
+      blocks.push(<div className="tutorial-table-wrap" key={key}><table><thead><tr>{headers.map((header, cellIndex) => <th key={`${header}-${cellIndex}`}>{renderInlineMarkdown(header)}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex}>{renderInlineMarkdown(row[cellIndex] ?? "")}</td>)}</tr>)}</tbody></table></div>);
+      continue;
+    }
+
+    if (!line.trim()) blocks.push(<span className="tutorial-space" key={key} />);
+    else if (image) blocks.push(<figure className="tutorial-image" key={key}><img src={image[2]} alt={image[1]} loading="lazy" />{image[1] && <figcaption>{image[1]}</figcaption>}</figure>);
+    else if (line.startsWith("## ")) blocks.push(<h3 key={key}>{renderInlineMarkdown(line.slice(3))}</h3>);
+    else if (line.startsWith("### ")) blocks.push(<h4 key={key}>{renderInlineMarkdown(line.slice(4))}</h4>);
+    else if (line.startsWith("- ")) blocks.push(<p className="tutorial-list-line" key={key}>• {renderInlineMarkdown(line.slice(2))}</p>);
+    else if (/^\d+\.\s/.test(line)) blocks.push(<p className="tutorial-list-line ordered" key={key}>{renderInlineMarkdown(line)}</p>);
+    else if (line.startsWith("> ")) blocks.push(<blockquote key={key}>{renderInlineMarkdown(line.slice(2))}</blockquote>);
+    else blocks.push(<p key={key}>{renderInlineMarkdown(line)}</p>);
+    index += 1;
+  }
+
+  return <div className="tutorial-body">{blocks}</div>;
 }
 
 function buildCsv(snapshot: FinanceBillSnapshot) {
@@ -1288,6 +1328,7 @@ export default function Home() {
             <div className="daily-meta">
               <span>{selectedDailyRecord.date}</span>
               <span>{recordCollections.find((collection) => collection.key === selectedDailyRecord.category)?.label}</span>
+              {selectedDailyRecord.updatedAt && <span>更新于 {selectedDailyRecord.updatedAt}</span>}
             </div>
             <h3>{selectedDailyRecord.title}</h3>
             <div className="record-tags">
@@ -1295,9 +1336,9 @@ export default function Home() {
                 <button type="button" key={tag} onClick={() => setSelectedDailyId(selectedDailyRecord.id)}>{tag}</button>
               ))}
             </div>
-            {selectedDailyRecord.paragraphs.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
+            {selectedDailyRecord.content
+              ? <TutorialBody content={selectedDailyRecord.content} />
+              : selectedDailyRecord.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
             {selectedDailyRecord.sources && (
               <div className="record-sources" aria-label="资料来源">
                 <span>资料来源与核验</span>
@@ -1432,7 +1473,7 @@ export default function Home() {
         </div>
         <div className="car-record-layout">
           <aside className="car-record-list">{carRecords.map((record) => <button type="button" className={selectedCarRecord.id === record.id ? "active" : ""} key={record.id} onClick={() => setSelectedCarRecordId(record.id)}><span>{record.date}</span><strong>{record.title}</strong></button>)}{carRecords.length === 0 && <p className="empty-state">这个阶段暂无记录，可先查看完整周期。</p>}</aside>
-          <article className="daily-entry car-daily-entry"><div className="daily-meta"><span>{selectedCarRecord.date}</span><span>{purchaseStages.find((stage) => stage.key === selectedCarRecord.stage)?.title ?? "汽车记录"}</span></div><h3>{selectedCarRecord.title}</h3>{selectedCarRecord.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}<div className="daily-takeaway"><span>记录结论</span><strong>{selectedCarRecord.takeaway}</strong></div></article>
+          <article className="daily-entry car-daily-entry"><div className="daily-meta"><span>{selectedCarRecord.date}</span><span>{purchaseStages.find((stage) => stage.key === selectedCarRecord.stage)?.title ?? "汽车记录"}</span>{selectedCarRecord.updatedAt && <span>更新于 {selectedCarRecord.updatedAt}</span>}</div><h3>{selectedCarRecord.title}</h3>{selectedCarRecord.content ? <TutorialBody content={selectedCarRecord.content} /> : selectedCarRecord.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}<div className="daily-takeaway"><span>记录结论</span><strong>{selectedCarRecord.takeaway}</strong></div></article>
         </div>
       </section>
 

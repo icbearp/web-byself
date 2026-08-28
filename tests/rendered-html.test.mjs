@@ -90,18 +90,25 @@ test("separates loan finance, first payment, and ownership-cost inputs", async (
   assert.match(pageSource, /brand-price-table/);
 });
 
-test("includes maintainable tutorials, visit statistics, and the local publisher", async () => {
-  const [pageSource, visitSource, publisherSource, tutorials] = await Promise.all([
+test("includes maintainable tutorials, records, drafts, visit statistics, and the local publisher", async () => {
+  const [pageSource, visitSource, publisherSource, publisherHtml, tutorials, records] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/stats/visits/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../tools/tutorial-publisher/server.mjs", import.meta.url), "utf8"),
+    readFile(new URL("../tools/tutorial-publisher/index.html", import.meta.url), "utf8"),
     readFile(new URL("../content/tutorials.json", import.meta.url), "utf8"),
+    readFile(new URL("../content/records.json", import.meta.url), "utf8"),
   ]);
   assert.match(pageSource, /Practical tutorials/);
   assert.match(pageSource, /累计访问/);
   assert.match(visitSource, /site_stats/);
   assert.match(publisherSource, /content\/tutorials\.json/);
+  assert.match(publisherSource, /drafts\.local\.json/);
+  assert.match(publisherSource, /content\/records\.json/);
+  assert.match(publisherHtml, /多维表格/);
+  assert.match(publisherHtml, /图片链接/);
   assert.match(tutorials, /把零散网页整理成可追溯的内容库/);
+  assert.equal(JSON.parse(records).length, 0);
 });
 
 test("supports guided accounts, cloud bills, and a private admin inbox", async () => {
