@@ -30,15 +30,17 @@ test("server-renders the structured personal homepage", async () => {
 
   const html = await response.text();
   assert.match(html, /周多福/);
-  assert.match(html, /先看四个专栏/);
+  assert.match(html, /离开一种身份，开始经营自己的长期选择/);
+  assert.match(html, /读随心记录/);
   assert.match(html, /关于我/);
   assert.match(html, /内容专栏/);
-  assert.match(html, /服务范围/);
+  assert.match(html, /工作室原则/);
   assert.match(html, /随心记录/);
-  assert.match(html, /购车与车型/);
-  assert.match(html, /金融计算/);
+  assert.match(html, /汽车数据与金融/);
   assert.match(html, /效率生活/);
-  assert.match(html, /\/images\/home-hero\.png/);
+  assert.match(html, /个人无限公司/);
+  assert.doesNotMatch(html, />购车与车型</);
+  assert.doesNotMatch(html, />金融计算</);
 });
 
 test("keeps generated lifestyle imagery local to the site", async () => {
@@ -59,9 +61,12 @@ test("keeps the primary navigation fixed and the buyer journey interactive", asy
   assert.match(styles, /\.journey-list\s*\{[\s\S]*?grid-template-columns:\s*repeat\(10,/);
   assert.match(pageSource, /aria-label="横向浏览买车阶段"/);
   assert.match(pageSource, /aria-pressed=\{selectedStage === item\.key\}/);
-  assert.match(pageSource, /个人无限公司，准备中/);
+  assert.match(pageSource, /个人无限公司/);
   assert.match(pageSource, /短期先活下来，长期才有意义/);
   assert.match(pageSource, /事实—影响—选项—请求—时间/);
+  assert.match(pageSource, /改变不了环境时，离开也是一种负责/);
+  assert.match(pageSource, /星宇股份/);
+  assert.match(pageSource, /特殊工时制度须申请并经批准后实施/);
 });
 
 test("separates loan finance, first payment, and ownership-cost inputs", async () => {
@@ -78,6 +83,11 @@ test("separates loan finance, first payment, and ownership-cost inputs", async (
   assert.match(pageSource, /留言与建议/);
   assert.match(pageSource, /\/api\/feedback/);
   assert.match(pageSource, /只用于贷款结清测算，不会改变下方的持有年限/);
+  assert.match(pageSource, /购车金额（含选装）/);
+  assert.match(pageSource, /selectedBrand === "nio"/);
+  assert.match(pageSource, /租电减免金额/);
+  assert.match(pageSource, /不自动填入/);
+  assert.match(pageSource, /brand-price-table/);
 });
 
 test("supports guided accounts, cloud bills, and a private admin inbox", async () => {
