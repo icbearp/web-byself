@@ -30,15 +30,15 @@ test("server-renders the structured personal homepage", async () => {
 
   const html = await response.text();
   assert.match(html, /周多福/);
-  assert.match(html, /离开一种身份，开始经营自己的长期选择/);
-  assert.match(html, /读随心记录/);
+  assert.match(html, /把复杂问题，整理成可以直接使用的教程与工具/);
+  assert.match(html, /浏览实用教程/);
   assert.match(html, /关于我/);
   assert.match(html, /内容专栏/);
   assert.match(html, /工作室原则/);
   assert.match(html, /随心记录/);
   assert.match(html, /汽车数据与金融/);
-  assert.match(html, /效率生活/);
-  assert.match(html, /个人无限公司/);
+  assert.match(html, /生活效率/);
+  assert.match(html, /经历不是标签，而是下一阶段的材料/);
   assert.doesNotMatch(html, />购车与车型</);
   assert.doesNotMatch(html, />金融计算</);
 });
@@ -78,16 +78,30 @@ test("separates loan finance, first payment, and ownership-cost inputs", async (
   assert.match(pageSource, /firstPaymentAmount/);
   assert.match(pageSource, /loanPayoffMonth/);
   assert.match(pageSource, /monthlyOwnershipCost/);
-  assert.match(pageSource, /贷款金额 × 3% × 2 年/);
-  assert.match(pageSource, /5\.64% 参考年化/);
+  assert.match(pageSource, /年化利率（合同口径）/);
+  assert.doesNotMatch(pageSource, /官方 5 年免 3 年利息/);
   assert.match(pageSource, /留言与建议/);
   assert.match(pageSource, /\/api\/feedback/);
-  assert.match(pageSource, /只用于贷款结清测算，不会改变下方的持有年限/);
+  assert.match(pageSource, /只用于贷款结清测算/);
   assert.match(pageSource, /购车金额（含选装）/);
-  assert.match(pageSource, /selectedBrand === "nio"/);
+  assert.match(pageSource, /nioGroupBrands\.includes\(selectedBrand\)/);
   assert.match(pageSource, /租电减免金额/);
   assert.match(pageSource, /不自动填入/);
   assert.match(pageSource, /brand-price-table/);
+});
+
+test("includes maintainable tutorials, visit statistics, and the local publisher", async () => {
+  const [pageSource, visitSource, publisherSource, tutorials] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/stats/visits/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../tools/tutorial-publisher/server.mjs", import.meta.url), "utf8"),
+    readFile(new URL("../content/tutorials.json", import.meta.url), "utf8"),
+  ]);
+  assert.match(pageSource, /Practical tutorials/);
+  assert.match(pageSource, /累计访问/);
+  assert.match(visitSource, /site_stats/);
+  assert.match(publisherSource, /content\/tutorials\.json/);
+  assert.match(tutorials, /把零散网页整理成可追溯的内容库/);
 });
 
 test("supports guided accounts, cloud bills, and a private admin inbox", async () => {

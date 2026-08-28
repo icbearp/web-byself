@@ -36,3 +36,9 @@ export const bills = sqliteTable("bills", {
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const siteStats = sqliteTable("site_stats", {
+  key: text("key").primaryKey(),
+  value: integer("value").notNull().default(0),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});

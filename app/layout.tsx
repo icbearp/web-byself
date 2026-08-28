@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase,
     title: "周多福 | 个人工作室",
     description:
-      "周多福的个人工作室，记录真实选择、职场思考、效率方法与重新开始。",
+      "周多福的个人知识与工具网站：实用教程、来源整理、随心记录、汽车数据与开放金融计算。",
     icons: {
       icon: "/favicon.svg",
       shortcut: "/favicon.svg",
@@ -21,14 +21,14 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: "周多福 | 个人工作室",
       description:
-        "离开旧角色，记录真实选择；整理效率方法，也保留开放、独立的实用工具。",
+        "把复杂问题整理成可以直接使用的教程与工具。",
       type: "website",
     },
     twitter: {
       card: "summary",
       title: "周多福 | 个人工作室",
       description:
-        "真实记录、独立判断、效率方法与开放工具。",
+        "实用教程、来源整理、真实记录与开放工具。",
     },
   };
 }

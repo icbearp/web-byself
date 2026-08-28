@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { calculateAnnualizedIrr, calculateFiveYearFreeThreeTotalInterest } from "./finance-math";
+import tutorialsData from "../content/tutorials.json";
+import changelogData from "../content/changelog.json";
+import { calculateAnnualizedIrr } from "./finance-math";
 
 type PurchaseMode = "vehicle" | "baas";
-type BrandKey = "nio" | "onvo" | "tesla" | "xiaomi" | "byd" | "other";
-type ColumnKey = "car" | "efficiency" | "information" | "life";
+type BrandKey = "nio" | "onvo" | "firefly" | "tesla" | "xiaomi" | "byd" | "li" | "geely" | "aito" | "xpeng" | "other";
+type ColumnKey = "tools" | "efficiency" | "information" | "life";
 type RecordCategoryKey = "car-info" | "career-growth" | "life-efficiency" | "side-project";
 type StageKey = "plan" | "online" | "offline" | "compare" | "experience" | "budget" | "communication" | "order" | "delivery" | "ownership";
 type FinanceMode = "equal-payment" | "equal-principal" | "interest-free";
 type PurchaseTaxMode = "new-energy" | "regular";
-type FinancePlanKey = "nio-five-year" | "nio-seven-year" | "custom";
+type FinancePlanKey = "custom";
 type WorkspaceKey = "home" | "records" | "car" | "life";
 type HomeViewKey = "about" | "columns";
 type FeedbackType = "suggestion" | "question" | "experience";
@@ -40,6 +42,18 @@ type EfficiencyNote = {
   title: string;
   summary: string;
   steps: string[];
+};
+
+type Tutorial = {
+  id: string;
+  title: string;
+  summary: string;
+  category: string;
+  tags: string[];
+  publishedAt: string;
+  updatedAt: string;
+  content: string;
+  sources: Array<{ label: string; href: string }>;
 };
 
 type DailyRecord = {
@@ -76,7 +90,7 @@ type FinanceFormState = {
   downPaymentRate: number;
   financeYears: number;
   annualRate: number;
-  fiveYearPayoffMonth: number;
+  fiveYearPayoffMonth?: number;
   loanPayoffMonth: number;
   ownershipYears: number;
   vatRate: number;
@@ -136,16 +150,16 @@ type SavedFinanceBill = {
 
 const workspaceTabs: Array<{ key: WorkspaceKey; label: string; description: string }> = [
   { key: "home", label: "首页", description: "个人选择、长期内容与开放工具" },
+  { key: "life", label: "生活效率", description: "实用教程、问题解法与效率方法" },
   { key: "records", label: "随心记录", description: "不追求日更，记录值得留下的判断" },
   { key: "car", label: "汽车数据与金融", description: "品牌价格参考、贷款与持有成本" },
-  { key: "life", label: "效率生活", description: "职场成长、效率方法与业余沉淀" },
 ];
 
 const profile = {
   name: "周多福",
   role: "独立内容创作者 / 工具实践者",
   intro:
-    "我已经离开汽车销售岗位，开始把真实经历、个人判断和实用工具整理成一间长期更新的个人工作室。这里不代表任何品牌，只帮助你把问题问清楚，再做自己的选择。",
+    "我把真实经历、个人判断和实用工具整理成一间长期更新的个人工作室。这里不代表任何品牌，内容尽量给出步骤、口径和来源，帮助你自己完成判断。",
   promise: ["保持独立判断", "尊重工作与生活的边界", "把能复用的方法留下来"],
 };
 
@@ -226,7 +240,6 @@ const dailyRecords: DailyRecord[] = [
     id: "2026-08-13-direct-sales-boundaries",
     date: "2026-08-13",
     category: "career-growth",
-    stage: "order",
     tags: ["#直营模式", "#向上管理", "#效率与权益", "#个人无限公司"],
     title: "短期先活下来，长期才有意义：在压力中争取边界、效率与利益",
     paragraphs: [
@@ -254,8 +267,8 @@ const dailyRecords: DailyRecord[] = [
     title: "内容不是越堆越多，而是要慢慢长成清晰的集合",
     paragraphs: [
       "今天重新看这个独立站，我意识到随心记录不能只是往下堆。前两篇记录一多，页面就会变长；以后如果持续更新几十篇、上百篇，访客反而更难找到真正需要的内容。",
-      "所以网站需要从“流水账”变成“内容集合”：按日期能回看当天记录，按话题能看同一类经验，按买车阶段能直接进入当前最相关的问题。这样首页保持简洁，但内容不会被折叠到没人看见。",
-      "这件事也很像做用户服务。用户不需要我把所有信息一次性倒给他，而是需要在合适的阶段看到合适的内容。好的整理，本质上是在降低对方理解和决策的成本。",
+      "所以网站需要从“流水账”变成“内容集合”：按日期能回看当天记录，按话题能看同一类经验，按教程能直接进入当前最相关的问题。这样首页保持简洁，但内容不会被折叠到没人看见。",
+      "读者不需要我把所有信息一次性倒给他，而是需要在合适的时刻看到合适的内容。好的整理，本质上是在降低对方理解和行动的成本。",
     ],
     takeaway: "长期内容要有分类、有路径、有入口；不是让页面显得很多，而是让用户更快找到对自己有用的那一篇。",
   },
@@ -312,7 +325,7 @@ const deliveryServices = [
 
 const columns: Column[] = [
   {
-    key: "car",
+    key: "tools",
     label: "独立工具",
     title: "把复杂问题拆成可以亲手验证的数字",
     copy: "从金融成本到长期预算，保留开放输入、清楚口径和可导出的结果。",
@@ -343,12 +356,12 @@ const columns: Column[] = [
 
 const articles: Article[] = [
   {
-    id: "car-fit",
-    column: "car",
-    title: "怎样判断一辆车是否适合你的真实生活？",
-    excerpt: "先不看配置表，先把每天的路线、停车、家庭成员和长途频率列出来。",
-    body: "车不是一张参数成绩单，而是每天都要参与生活的工具。判断一台车，先从最常发生的场景开始，再看空间、补能、舒适和预算能不能一起成立。",
-    points: ["先记录一周真实出行，而不是凭想象买车", "把最常坐车的人放进决策中心", "把整车购买、BaaS 和长期用车成本分开算"],
+    id: "problem-to-proof",
+    column: "tools",
+    title: "怎样把一个复杂问题拆成可验证的步骤？",
+    excerpt: "先定义想得到的结果，再把事实、假设、计算和行动分开。",
+    body: "复杂问题常常不是缺少答案，而是多个口径混在一起。先写清目标与限制，再分别收集事实、标记假设、完成计算，最后列出下一步；每一层都能单独检查，结论才更可靠。",
+    points: ["用一句话定义问题和需要的输出", "把已经确认的事实与暂时假设分开", "让每个数字都有来源，让每个行动都有下一步"],
   },
   {
     id: "ai-workflow",
@@ -399,6 +412,7 @@ const efficiencyNotes: EfficiencyNote[] = [
 
 const brandReferences: Array<{
   key: Exclude<BrandKey, "other">;
+  group: string;
   name: string;
   representative: string;
   price: string;
@@ -406,11 +420,16 @@ const brandReferences: Array<{
   officialUrl: string;
   sourceDate: string;
 }> = [
-  { key: "nio", name: "蔚来 NIO", representative: "ET5 / ET5T", price: "整车 ¥29.80 万起；BaaS ¥22.80 万起", structure: "纯电；本计算器可手动填写租电减免与月租", officialUrl: "https://www.nio.com/news/20250525001", sourceDate: "官方发布 2025-05" },
-  { key: "onvo", name: "乐道 ONVO", representative: "新乐道 L60", price: "整车 ¥19.28 万起；BaaS ¥13.58 万起", structure: "纯电；表格保留官方租电参考，计算器按普通品牌处理", officialUrl: "https://www.onvo.cn/news/20260611001", sourceDate: "官方发布 2026-06" },
-  { key: "tesla", name: "特斯拉", representative: "Model 3", price: "¥23.55–33.95 万", structure: "纯电；价格随版本与限时权益变化", officialUrl: "https://www.tesla.cn/model3/design", sourceDate: "官网核对 2026-08" },
-  { key: "xiaomi", name: "小米汽车", representative: "新一代 SU7", price: "¥21.99–30.39 万", structure: "纯电；Standard / Pro / Max 样本", officialUrl: "https://www.mi.com/global/discover/article?id=6117", sourceDate: "官方发布 2026-03" },
-  { key: "byd", name: "比亚迪", representative: "海豹 07 DM-i", price: "¥13.98–19.58 万", structure: "插混；用于展示大众新能源价位样本", officialUrl: "https://www.byd.com/cn/ocean-home/models/haibao/haibao-07-dm-i", sourceDate: "官网核对 2026-08" },
+  { key: "nio", group: "蔚来公司", name: "NIO 蔚来", representative: "ET5 / ET5T / ES6 / EC6 / ET9", price: "整车 ¥29.80 万起；BaaS ¥22.80 万起", structure: "纯电；支持换电与 BaaS 手动输入", officialUrl: "https://www.nio.com/news/20250525001", sourceDate: "官方发布 2025-05" },
+  { key: "onvo", group: "蔚来公司", name: "ONVO 乐道", representative: "L60 / L90", price: "L60 整车 ¥19.28 万起；BaaS ¥13.58 万起", structure: "纯电；支持换电与 BaaS 手动输入", officialUrl: "https://www.onvo.cn/news/20260611001", sourceDate: "官方发布 2026-06" },
+  { key: "firefly", group: "蔚来公司", name: "firefly 萤火虫", representative: "萤火虫 / halo 光之环", price: "整车 ¥11.98 万起；BaaS ¥7.98 万起", structure: "纯电小车；支持换电与 BaaS 手动输入", officialUrl: "https://www.firefly.com.cn/news/20260414001", sourceDate: "官方发布 2026-04" },
+  { key: "tesla", group: "独立品牌", name: "特斯拉", representative: "Model 3 / Model Y", price: "Model 3 ¥23.55–33.95 万", structure: "纯电；价格随版本与限时权益变化", officialUrl: "https://www.tesla.cn/model3/design", sourceDate: "官网核对 2026-08" },
+  { key: "xiaomi", group: "独立品牌", name: "小米汽车", representative: "SU7 / YU7", price: "新一代 SU7 ¥21.99–30.39 万", structure: "纯电；Standard / Pro / Max 样本", officialUrl: "https://www.mi.com/global/discover/article?id=6117", sourceDate: "官方发布 2026-03" },
+  { key: "byd", group: "比亚迪集团", name: "比亚迪", representative: "秦 / 宋 / 海豹 / 海狮", price: "海豹 07 DM-i ¥13.98–19.58 万", structure: "纯电与插混；大众新能源价位样本", officialUrl: "https://www.byd.com/cn/ocean-home/models/haibao/haibao-07-dm-i", sourceDate: "官网核对 2026-08" },
+  { key: "li", group: "独立品牌", name: "理想汽车", representative: "L6 / L7 / L8 / L9 / i8", price: "新 L6 ¥24.98 万起", structure: "增程与纯电；版本价格以配置页为准", officialUrl: "https://ir.lixiang.com/news-releases/news-release-details/li-auto-inc-launches-new-li-l6-versatile-all-wheel-drive-suv", sourceDate: "官方发布 2026-07" },
+  { key: "geely", group: "吉利集团", name: "吉利银河", representative: "E5 / 星愿 / M9", price: "银河 E5 ¥10.98–14.58 万", structure: "纯电与插混；代表车型公开指导价", officialUrl: "https://galaxy.geely.com/E5", sourceDate: "官网核对 2026-08" },
+  { key: "aito", group: "鸿蒙智行", name: "问界", representative: "M5 / M7 / M8 / M9", price: "新 M7 ¥29.98–37.98 万", structure: "增程与纯电；五座、六座版本不同", officialUrl: "https://aito.auto/model/m7-new/configuration/", sourceDate: "官网核对 2026-08" },
+  { key: "xpeng", group: "独立品牌", name: "小鹏汽车", representative: "MONA M03 / P7+ / G6 / G9", price: "MONA M03 ¥11.98–15.58 万", structure: "纯电；代表车型发布价样本", officialUrl: "https://www.xpeng.com/news/01919c4e3d0b918dc2b08a0282360019", sourceDate: "官方发布 2024-08" },
 ];
 
 const brandOptions: Array<{ key: BrandKey; label: string }> = [
@@ -418,45 +437,9 @@ const brandOptions: Array<{ key: BrandKey; label: string }> = [
   { key: "other", label: "其他品牌" },
 ];
 
-const financePresets: Array<{
-  key: FinancePlanKey;
-  label: string;
-  note: string;
-  badge: string;
-  downPaymentRate?: number;
-  termYears?: number;
-  annualRate?: number;
-  mode?: FinanceMode;
-}> = [
-  {
-    key: "nio-five-year",
-    label: "官方 5 年免 3 年利息",
-    note: "前 3 年 0 费；后 2 年按原贷款金额 × 3% × 2 年计算总利息。",
-    badge: "0% / 3%",
-    downPaymentRate: 0,
-    termYears: 5,
-    annualRate: 3,
-  },
-  {
-    key: "nio-seven-year",
-    label: "官方 7 年超低息",
-    note: "年化费率 0.99%，三个月后可申请一次性还清。",
-    badge: "0.99%",
-    downPaymentRate: 20,
-    termYears: 7,
-    annualRate: 0.99,
-  },
-  {
-    key: "custom",
-    label: "高自由度自定义",
-    note: "自己填首付、年限、费率、月供方式，适合做个人测算。",
-    badge: "自由填写",
-    downPaymentRate: 30,
-    termYears: 5,
-    annualRate: 3.5,
-    mode: "equal-payment",
-  },
-];
+const tutorials = tutorialsData as Tutorial[];
+const changelog = changelogData as Array<{ date: string; title: string; detail: string }>;
+const nioGroupBrands: BrandKey[] = ["nio", "onvo", "firefly"];
 
 const formatPrice = (value: number) => new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", maximumFractionDigits: 0 }).format(value);
 
@@ -544,64 +527,6 @@ function calculateLoanQuote(principal: number, annualRate: number, months: numbe
   };
 }
 
-function calculateFlatFeeLoan(principal: number, months: number, annualFeeRate: number, years: number): LoanQuote {
-  const safeMonths = Math.max(1, Math.round(months));
-  const balanceStart = Math.max(0, principal);
-  const totalInterest = balanceStart * (annualFeeRate / 100) * years;
-  const monthlyPrincipal = balanceStart / safeMonths;
-  const monthlyFee = totalInterest / safeMonths;
-  let balance = balanceStart;
-  const remainingPrincipalByMonth = [balanceStart];
-  const principalPayments: number[] = [];
-  const monthlyPayments = Array.from({ length: safeMonths }, () => {
-    balance = Math.max(0, balance - monthlyPrincipal);
-    principalPayments.push(monthlyPrincipal);
-    remainingPrincipalByMonth.push(balance);
-    return monthlyPrincipal + monthlyFee;
-  });
-
-  return {
-    monthlyRate: annualFeeRate / 100 / 12,
-    monthlyPayments,
-    principalPayments,
-    remainingPrincipalByMonth,
-    totalPayment: balanceStart + totalInterest,
-    totalInterest,
-    firstPayment: monthlyPayments[0] ?? 0,
-    lastPayment: monthlyPayments[safeMonths - 1] ?? 0,
-  };
-}
-
-function calculateNioFiveYearQuote(principal: number): LoanQuote {
-  const safePrincipal = Math.max(0, principal);
-  const months = 60;
-  const freeMonths = 36;
-  const lowRateMonths = 24;
-  const monthlyPrincipal = safePrincipal / months;
-  const lowInterestTotal = calculateFiveYearFreeThreeTotalInterest(safePrincipal);
-  const lowMonthlyFee = lowInterestTotal / lowRateMonths;
-  let balance = safePrincipal;
-  const remainingPrincipalByMonth = [safePrincipal];
-  const principalPayments: number[] = [];
-  const monthlyPayments = Array.from({ length: months }, (_, index) => {
-    balance = Math.max(0, balance - monthlyPrincipal);
-    principalPayments.push(monthlyPrincipal);
-    remainingPrincipalByMonth.push(balance);
-    return index < freeMonths ? monthlyPrincipal : monthlyPrincipal + lowMonthlyFee;
-  });
-
-  return {
-    monthlyRate: 0,
-    monthlyPayments,
-    principalPayments,
-    remainingPrincipalByMonth,
-    totalPayment: safePrincipal + lowInterestTotal,
-    totalInterest: lowInterestTotal,
-    firstPayment: monthlyPayments[0] ?? 0,
-    lastPayment: monthlyPayments[months - 1] ?? 0,
-  };
-}
-
 const BILL_STORAGE_KEY = "zhouduofu-finance-bills-v2";
 
 function escapeHtml(value: string) {
@@ -627,6 +552,21 @@ function downloadText(filename: string, content: string, mimeType: string) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function TutorialBody({ content }: { content: string }) {
+  return (
+    <div className="tutorial-body">
+      {content.split("\n").map((line, index) => {
+        const key = `${index}-${line.slice(0, 12)}`;
+        if (!line.trim()) return <span className="tutorial-space" key={key} />;
+        if (line.startsWith("## ")) return <h3 key={key}>{line.slice(3)}</h3>;
+        if (line.startsWith("### ")) return <h4 key={key}>{line.slice(4)}</h4>;
+        if (line.startsWith("- ")) return <p className="tutorial-list-line" key={key}>• {line.slice(2)}</p>;
+        return <p key={key}>{line}</p>;
+      })}
+    </div>
+  );
 }
 
 function buildCsv(snapshot: FinanceBillSnapshot) {
@@ -797,21 +737,23 @@ export default function Home() {
   const [selectedRecordCategory, setSelectedRecordCategory] = useState<RecordCategoryKey | "all">("all");
   const [selectedStage, setSelectedStage] = useState<StageKey | "all">("all");
   const [selectedDailyId, setSelectedDailyId] = useState("2026-08-28-leaving-is-also-a-choice");
+  const [selectedCarRecordId, setSelectedCarRecordId] = useState("2026-07-24-first-car-stage");
   const [selectedColumn, setSelectedColumn] = useState<ColumnKey | "all">("all");
   const [articleQuery, setArticleQuery] = useState("");
-  const [expandedArticle, setExpandedArticle] = useState<string | null>("car-fit");
+  const [expandedArticle, setExpandedArticle] = useState<string | null>("problem-to-proof");
   const [expandedEfficiency, setExpandedEfficiency] = useState<string | null>(null);
+  const [selectedTutorialId, setSelectedTutorialId] = useState(tutorials[0]?.id ?? "");
+  const [tutorialCategory, setTutorialCategory] = useState("全部");
+  const [visitCount, setVisitCount] = useState<number | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<BrandKey>("other");
   const [batteryReduction, setBatteryReduction] = useState(0);
   const [purchaseMode, setPurchaseMode] = useState<PurchaseMode>("vehicle");
   const [manualVehiclePrice, setManualVehiclePrice] = useState(202800);
-  const [financePlan, setFinancePlan] = useState<FinancePlanKey>("custom");
   const [financeMode, setFinanceMode] = useState<FinanceMode>("equal-payment");
   const [purchaseTaxMode, setPurchaseTaxMode] = useState<PurchaseTaxMode>("new-energy");
   const [downPaymentRate, setDownPaymentRate] = useState(20);
   const [financeYears, setFinanceYears] = useState(5);
   const [annualRate, setAnnualRate] = useState(3.5);
-  const [fiveYearPayoffMonth, setFiveYearPayoffMonth] = useState(36);
   const [loanPayoffMonth, setLoanPayoffMonth] = useState(60);
   const [ownershipYears, setOwnershipYears] = useState(5);
   const [vatRate, setVatRate] = useState(13);
@@ -859,52 +801,37 @@ export default function Home() {
 
   const filteredDailyRecords = useMemo(() => {
     return dailyRecords.filter((record) => {
+      if (record.category === "car-info") return false;
       const matchesCategory = selectedRecordCategory === "all" || record.category === selectedRecordCategory;
-      const matchesStage = selectedStage === "all" || record.stage === selectedStage;
-      return matchesCategory && matchesStage;
+      return matchesCategory;
     });
-  }, [selectedRecordCategory, selectedStage]);
+  }, [selectedRecordCategory]);
 
   const selectedDailyRecord = filteredDailyRecords.find((record) => record.id === selectedDailyId) ?? filteredDailyRecords[0] ?? dailyRecords[0];
   const activeCollection = selectedRecordCategory === "all" ? null : recordCollections.find((collection) => collection.key === selectedRecordCategory);
   const activePurchaseStage = selectedStage === "all" ? null : purchaseStages.find((stage) => stage.key === selectedStage);
+  const carRecords = dailyRecords.filter((record) => record.category === "car-info" && (selectedStage === "all" || record.stage === selectedStage));
+  const selectedCarRecord = carRecords.find((record) => record.id === selectedCarRecordId) ?? carRecords[0] ?? dailyRecords.find((record) => record.category === "car-info")!;
+  const tutorialCategories = ["全部", ...Array.from(new Set(tutorials.map((tutorial) => tutorial.category)))];
+  const visibleTutorials = tutorials.filter((tutorial) => tutorialCategory === "全部" || tutorial.category === tutorialCategory);
+  const selectedTutorial = visibleTutorials.find((tutorial) => tutorial.id === selectedTutorialId) ?? visibleTutorials[0] ?? tutorials[0];
 
   const currentBrandLabel = brandOptions.find((brand) => brand.key === selectedBrand)?.label ?? "其他品牌";
   const currentBrandReference = brandReferences.find((brand) => brand.key === selectedBrand);
-  const nioBaasEnabled = selectedBrand === "nio" && purchaseMode === "baas";
+  const nioBaasEnabled = nioGroupBrands.includes(selectedBrand) && purchaseMode === "baas";
   const basePrice = manualVehiclePrice;
   const vehicleSubtotal = Math.max(0, basePrice - (nioBaasEnabled ? batteryReduction : 0));
   const purchaseTax = calculatePurchaseTax(vehicleSubtotal, purchaseTaxMode, vatRate);
   const downPaymentAmount = (vehicleSubtotal * downPaymentRate) / 100;
   const loanPrincipal = Math.max(0, vehicleSubtotal - downPaymentAmount);
   const customLoanTermMonths = Math.max(1, Math.round(financeYears * 12));
-  const loanTermMonths = financePlan === "nio-five-year" ? 60 : financePlan === "nio-seven-year" ? 84 : customLoanTermMonths;
+  const loanTermMonths = customLoanTermMonths;
   const ownershipMonths = Math.max(1, Math.round(ownershipYears * 12));
-  const customLoanQuote = calculateLoanQuote(loanPrincipal, annualRate, customLoanTermMonths, financeMode);
-  const officialFiveYearQuote = calculateNioFiveYearQuote(loanPrincipal);
-  const officialSevenYearQuote = calculateFlatFeeLoan(loanPrincipal, 84, 0.99, 7);
-  const loanQuote =
-    financePlan === "nio-five-year"
-      ? officialFiveYearQuote
-      : financePlan === "nio-seven-year"
-        ? officialSevenYearQuote
-        : customLoanQuote;
-  const displayedRateLabel =
-    financePlan === "nio-five-year"
-      ? "3% 费率 / 5.64% 参考年化"
-      : financePlan === "nio-seven-year"
-        ? "0.99%"
-        : formatPercent(annualRate);
-  const selectedFinancePlan = financePresets.find((preset) => preset.key === financePlan) ?? financePresets[0];
-  const earlyPayoffEligibleMonth = financePlan === "nio-five-year" ? 36 : financePlan === "nio-seven-year" ? 3 : 0;
-  const earlyPayoffAmount =
-    earlyPayoffEligibleMonth > 0
-      ? loanQuote.remainingPrincipalByMonth[Math.min(earlyPayoffEligibleMonth, loanQuote.remainingPrincipalByMonth.length - 1)] ?? 0
-      : 0;
-  const settlementMonth =
-    financePlan === "nio-five-year"
-      ? Math.min(loanTermMonths, Math.max(36, Math.round(fiveYearPayoffMonth)))
-      : Math.min(loanTermMonths, Math.max(1, Math.round(loanPayoffMonth)));
+  const loanQuote = calculateLoanQuote(loanPrincipal, annualRate, customLoanTermMonths, financeMode);
+  const displayedRateLabel = formatPercent(annualRate);
+  const earlyPayoffEligibleMonth = 0;
+  const earlyPayoffAmount = 0;
+  const settlementMonth = Math.min(loanTermMonths, Math.max(1, Math.round(loanPayoffMonth)));
   const settlementAmount = settlementMonth < loanTermMonths
     ? loanQuote.remainingPrincipalByMonth[settlementMonth] ?? 0
     : 0;
@@ -921,12 +848,7 @@ export default function Home() {
   const monthlyLoanPayment = loanQuote.monthlyPayments[0] ?? 0;
   const loanPaymentsThroughSettlement = loanQuote.monthlyPayments.slice(0, settlementMonth).reduce((sum, payment) => sum + payment, 0);
   const interestPaidThroughSettlement = Math.max(0, loanPaymentsThroughSettlement + settlementAmount - loanPrincipal);
-  const planDescription =
-    financePlan === "nio-five-year"
-      ? `5 年 60 期：前 36 期 0 费，后 24 期按原贷款金额 × 3% × 2 年计费；按第 ${settlementMonth} 期结清，总利息约 ${formatPrice(interestPaidThroughSettlement)}，结清金额约 ${formatPrice(settlementAmount)}。`
-      : financePlan === "nio-seven-year"
-        ? "7 年 84 期：按年化费率 0.99% 估算；满 3 期后可申请一次性结清。"
-        : `自定义 ${financeYears || 0} 年 ${customLoanTermMonths} 期，按你输入的年化利率和还款方式估算。`;
+  const planDescription = `自定义 ${financeYears || 0} 年 ${customLoanTermMonths} 期，按你输入的年化利率、还款方式和第 ${settlementMonth} 期结清估算。`;
   const batteryMonths = nioBaasEnabled ? ownershipMonths : 0;
   const batteryRentTotal = batteryRentMonthly * batteryMonths;
   const monthlyRunningCost = chargingMonthly + parkingMonthly + maintenanceMonthly;
@@ -953,29 +875,28 @@ export default function Home() {
     { label: "金融服务费", amount: financeServiceFee, note: "如方案没有该项，可保持为 0" },
   ];
   const ownershipMonthlyFeeItems = [
-    { label: "BaaS 电池月租", amount: nioBaasEnabled ? batteryRentMonthly : 0, note: "仅蔚来 NIO 选择租电方案时计入，按你的合同月租填写" },
+    { label: "BaaS 电池月租", amount: nioBaasEnabled ? batteryRentMonthly : 0, note: "仅蔚来公司三个品牌选择租电方案时计入，按合同月租填写" },
     { label: "充电 / 换电", amount: chargingMonthly, note: "按个人通勤里程和补能习惯估算" },
     { label: "停车", amount: parkingMonthly, note: "车位、临停或单位停车费用" },
     { label: "保养及杂费", amount: maintenanceMonthly, note: "洗车、耗材、轮胎、保养等长期支出" },
   ];
   const monthlyFeeItems = [
-    { label: "金融月供", amount: monthlyLoanPayment, note: financePlan === "nio-five-year" ? "前 36 期免息月供，后 24 期会变化" : financePlan === "nio-seven-year" ? "7 年超低息方案估算月供" : financeMode === "equal-principal" ? "等额本金首月最高，后续递减" : financeMode === "interest-free" ? "免息分期，本金平均摊还" : "等额本息，每月基本一致" },
-    { label: "后段月供", amount: loanQuote.lastPayment, note: financePlan === "nio-five-year" ? "第 37-60 期参考月供" : "当前方案末期月供参考" },
-    { label: "结清金额参考", amount: settlementAmount, note: settlementAmount > 0 ? `按第 ${settlementMonth} 期一次结清估算` : earlyPayoffEligibleMonth > 0 ? `满 ${earlyPayoffEligibleMonth} 期可申请，具体以金融机构确认为准` : "当前按完整分期还完" },
+    { label: "金融月供", amount: monthlyLoanPayment, note: financeMode === "equal-principal" ? "等额本金首月最高，后续递减" : financeMode === "interest-free" ? "免息分期，本金平均摊还" : "等额本息，每月基本一致" },
+    { label: "末期月供", amount: loanQuote.lastPayment, note: "当前输入方案的末期月供参考" },
+    { label: "结清金额参考", amount: settlementAmount, note: settlementAmount > 0 ? `按第 ${settlementMonth} 期一次结清估算` : "当前按完整分期还完" },
     ...ownershipMonthlyFeeItems,
   ];
   const currentBillSnapshot: FinanceBillSnapshot = {
     selectedBrand,
     batteryReduction,
     purchaseMode,
-    financePlan,
+    financePlan: "custom",
     financeMode,
     purchaseTaxMode,
     manualVehiclePrice,
     downPaymentRate,
     financeYears,
     annualRate,
-    fiveYearPayoffMonth,
     loanPayoffMonth,
     ownershipYears,
     vatRate,
@@ -1063,13 +984,31 @@ export default function Home() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function countVisit() {
+      try {
+        const method = window.sessionStorage.getItem("zhouduofu-visit-counted") ? "GET" : "POST";
+        const response = await fetch("/api/stats/visits", { method });
+        const payload = (await response.json()) as { count?: number };
+        if (!cancelled && response.ok && typeof payload.count === "number") {
+          setVisitCount(payload.count);
+          window.sessionStorage.setItem("zhouduofu-visit-counted", "1");
+        }
+      } catch {
+        // The site remains usable when the visit counter is temporarily unavailable.
+      }
+    }
+    void countVisit();
+    return () => { cancelled = true; };
+  }, []);
+
   function chooseBrand(brand: BrandKey) {
     setSelectedBrand(brand);
-    if (brand !== "nio") {
+    if (!nioGroupBrands.includes(brand)) {
       setPurchaseMode("vehicle");
       setBatteryReduction(0);
       setBatteryRentMonthly(0);
-      setFinancePlan("custom");
     }
   }
 
@@ -1079,22 +1018,6 @@ export default function Home() {
       setBatteryReduction(0);
       setBatteryRentMonthly(0);
     }
-  }
-
-  function applyFinancePreset(preset: typeof financePresets[number]) {
-    setFinancePlan(preset.key);
-    if (preset.key === "nio-five-year") setFiveYearPayoffMonth(36);
-    if (preset.downPaymentRate !== undefined) setDownPaymentRate(preset.downPaymentRate);
-    if (preset.termYears !== undefined) {
-      setFinanceYears(preset.termYears);
-      setLoanPayoffMonth(preset.termYears * 12);
-    }
-    if (preset.mode) setFinanceMode(preset.mode);
-    if (preset.annualRate !== undefined) setAnnualRate(preset.annualRate);
-  }
-
-  function switchToCustomPlan() {
-    setFinancePlan("custom");
   }
 
   async function saveCurrentBill() {
@@ -1131,15 +1054,13 @@ export default function Home() {
     const restoredBrand = form.selectedBrand ?? (form.currentModelName?.includes("乐道") ? "onvo" : "other");
     setSelectedBrand(restoredBrand);
     setBatteryReduction(form.batteryReduction ?? 0);
-    setPurchaseMode(restoredBrand === "nio" ? form.purchaseMode : "vehicle");
-    setFinancePlan(form.financePlan);
+    setPurchaseMode(nioGroupBrands.includes(restoredBrand) ? form.purchaseMode : "vehicle");
     setFinanceMode(form.financeMode);
     setPurchaseTaxMode(form.purchaseTaxMode);
     setManualVehiclePrice(form.manualVehiclePrice);
     setDownPaymentRate(form.downPaymentRate);
     setFinanceYears(form.financeYears);
     setAnnualRate(form.annualRate);
-    setFiveYearPayoffMonth(form.fiveYearPayoffMonth ?? 36);
     setLoanPayoffMonth(form.loanPayoffMonth ?? Math.max(1, Math.min(form.financeYears * 12, form.ownershipYears * 12)));
     setOwnershipYears(form.ownershipYears);
     setVatRate(form.vatRate);
@@ -1182,16 +1103,14 @@ export default function Home() {
 
   function chooseRecordCategory(category: RecordCategoryKey | "all") {
     setSelectedRecordCategory(category);
-    setSelectedStage("all");
-    const nextRecord = dailyRecords.find((record) => category === "all" || record.category === category);
+    const nextRecord = dailyRecords.find((record) => record.category !== "car-info" && (category === "all" || record.category === category));
     if (nextRecord) setSelectedDailyId(nextRecord.id);
   }
 
   function chooseStage(stage: StageKey | "all") {
     setSelectedStage(stage);
-    setSelectedRecordCategory("car-info");
     const nextRecord = dailyRecords.find((record) => stage === "all" ? record.category === "car-info" : record.stage === stage);
-    if (nextRecord) setSelectedDailyId(nextRecord.id);
+    if (nextRecord) setSelectedCarRecordId(nextRecord.id);
   }
 
   function selectWorkspace(workspace: WorkspaceKey) {
@@ -1305,22 +1224,22 @@ export default function Home() {
 
       <section className="hero" id="top">
         <div className="hero-copy">
-          <p className="eyebrow">Personal studio · A new chapter</p>
-          <h1>离开一种身份，开始经营自己的长期选择。</h1>
-          <p className="hero-text">我是周多福。我已经离开汽车销售岗位，这里也不再围绕成交展开。接下来，我会把更多空间留给真实记录、职业思考和可以长期复用的方法，让过往经验成为下一段路的养分。</p>
-          <div className="hero-actions"><button className="primary-action" type="button" onClick={() => selectWorkspace("records")}>读随心记录</button><button className="secondary-action" type="button" onClick={() => selectWorkspace("car")}>打开实用工具</button></div>
-          <div className="hero-proof"><span>现在的方向</span><strong>独立、清醒、持续生长</strong><small>不依附某个岗位，也不放弃真实经验的价值。</small></div>
+          <p className="eyebrow">Tutorials · Tools · Open notes</p>
+          <h1>把复杂问题，整理成可以直接使用的教程与工具。</h1>
+          <p className="hero-text">这是周多福的个人知识与工具网站。这里提供可照着完成的生活效率教程、保留来源的内容整理方法、开放计算工具，以及对真实经历的长期记录。</p>
+          <div className="hero-actions"><button className="primary-action" type="button" onClick={() => selectWorkspace("life")}>浏览实用教程</button><button className="secondary-action" type="button" onClick={() => selectWorkspace("car")}>使用计算工具</button></div>
+          <div className="hero-proof"><span>网站用途</span><strong>解决问题，而不是堆积信息</strong><small>每篇内容尽量给出步骤、来源和可以复用的结果。</small></div>
         </div>
         <div className="hero-panel studio-orbit" aria-label="个人工作室的三个方向">
-          <div className="orbit-core"><span>ZHOU</span><strong>个人无限公司</strong><small>准备中，也在行动中</small></div>
-          <div className="orbit-note orbit-note-one"><span>01</span><strong>真实记录</strong></div>
-          <div className="orbit-note orbit-note-two"><span>02</span><strong>独立判断</strong></div>
+          <div className="orbit-core"><span>ZHOU</span><strong>知识工作室</strong><small>持续整理，持续更新</small></div>
+          <div className="orbit-note orbit-note-one"><span>01</span><strong>实用教程</strong></div>
+          <div className="orbit-note orbit-note-two"><span>02</span><strong>来源与判断</strong></div>
           <div className="orbit-note orbit-note-three"><span>03</span><strong>开放工具</strong></div>
-          <div className="signal-card"><span>当前状态</span><strong>离开旧角色，建立新节奏。</strong></div>
+          <div className="signal-card"><span>内容标准</span><strong>看得懂，也能照着做。</strong></div>
         </div>
       </section>
 
-      <section className="intro-band"><p>一间简单、开放的个人工作室：记录选择，整理方法，认真经营每一次重新开始。</p></section>
+      <section className="intro-band"><p>教程给步骤，工具给结果，记录保留思考过程。</p></section>
       <div className="workspace-anchor" id="workspace-content" aria-hidden="true" />
 
       {activeWorkspace === "records" && <section className="section daily-record-section" id="daily-record">
@@ -1338,7 +1257,7 @@ export default function Home() {
             <strong>按日期回看所有沉淀</strong>
             <p>保留完整时间线，方便快速找到最近写过的内容。</p>
           </button>
-          {recordCollections.map((collection) => (
+          {recordCollections.filter((collection) => collection.key !== "car-info").map((collection) => (
             <button type="button" className={selectedRecordCategory === collection.key ? "collection-card active" : "collection-card"} key={collection.key} onClick={() => chooseRecordCategory(collection.key)}>
               <span>{collection.label}</span>
               <strong>{collection.title}</strong>
@@ -1369,7 +1288,6 @@ export default function Home() {
             <div className="daily-meta">
               <span>{selectedDailyRecord.date}</span>
               <span>{recordCollections.find((collection) => collection.key === selectedDailyRecord.category)?.label}</span>
-              {selectedDailyRecord.stage && <span>{purchaseStages.find((stage) => stage.key === selectedDailyRecord.stage)?.title}</span>}
             </div>
             <h3>{selectedDailyRecord.title}</h3>
             <div className="record-tags">
@@ -1394,48 +1312,6 @@ export default function Home() {
 
         </div>
 
-        <div className="journey-dashboard">
-          <section className="timeline-card" id="journey">
-              <div className="timeline-head">
-                <div>
-                  <p className="eyebrow">Buyer journey</p>
-                  <h3>买车阶段时间线</h3>
-                </div>
-                <button type="button" className={selectedStage === "all" ? "filter-chip active" : "filter-chip"} onClick={() => chooseStage("all")}>全部阶段</button>
-              </div>
-              <div className="journey-scroll" tabIndex={0} aria-label="横向浏览买车阶段">
-                <ol className="journey-list">
-                  {purchaseStages.map((item) => (
-                    <li key={item.step} className={selectedStage === item.key ? "active" : ""}>
-                      <button type="button" aria-pressed={selectedStage === item.key} onClick={() => chooseStage(item.key)} aria-label={`查看${item.title}阶段的记录`}>
-                        <span>{item.step}</span>
-                        <strong>{item.title}</strong>
-                      </button>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-              <div className="journey-active-note" aria-live="polite">
-                <span>{activePurchaseStage ? `阶段 ${activePurchaseStage.step}` : "全部阶段"}</span>
-                <strong>{activePurchaseStage?.title ?? "完整买车路径"}</strong>
-                <p>{activePurchaseStage?.note ?? "点击任一阶段，会同步筛选上方的相关记录；再次查看全部阶段可回到完整时间线。"}</p>
-              </div>
-          </section>
-
-          <section className="delivery-card compact-delivery-card">
-              <p className="eyebrow">Delivery service</p>
-              <h3>交付后的用车生命周期服务</h3>
-              <p>
-                对蔚来这类用户企业来说，交付不是结束，而是长期服务和生态体验的开始。
-                重点不只是把车交出去，而是让后面的用车问题、补能、售后和社区体验都能持续被接住。
-              </p>
-              <ul>
-                {deliveryServices.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-          </section>
-        </div>
         {activeCollection && <p className="collection-note">当前集合：{activeCollection.label}。{activeCollection.intro}</p>}
       </section>}
 
@@ -1453,7 +1329,15 @@ export default function Home() {
                 <div className="profile-mark">周</div>
                 <div><p className="eyebrow">About the person behind the page</p><h2>{profile.name}</h2><p className="profile-role">{profile.role}</p><p>{profile.intro}</p><a className="text-link" href="mailto:otafukuchau@gmail.com">发邮件聊聊 →</a></div>
               </div>
-              <div className="profile-notes"><p className="eyebrow">工作室原则</p><h3>不再用一个岗位定义自己，把经验变成可持续的内容与工具。</h3><ul>{profile.promise.map((item) => <li key={item}>{item}</li>)}</ul><p className="muted-note">长期方向：随心记录、独立工具、效率方法与生活选择。</p></div>
+              <div className="profile-notes"><p className="eyebrow">工作室原则</p><h3>把经验变成能复用的内容，把判断留给每一位使用者。</h3><ul>{profile.promise.map((item) => <li key={item}>{item}</li>)}</ul><p className="muted-note">长期方向：实用教程、随心记录、开放工具与生活选择。</p></div>
+            </section>
+            <section className="career-path" aria-labelledby="career-path-heading">
+              <div><p className="eyebrow">Personal path</p><h2 id="career-path-heading">经历不是标签，而是下一阶段的材料。</h2></div>
+              <ol>
+                <li><span>01</span><div><strong>汽车一线销售</strong><p>在真实用户、价格与服务之间，积累沟通、金融计算和决策支持经验。</p></div></li>
+                <li><span>02</span><div><strong>重新选择边界</strong><p>离开长期不可持续的工作节奏，重新审视健康、权益与个人发展的关系。</p></div></li>
+                <li><span>03</span><div><strong>个人知识工作室</strong><p>把经历整理为教程、工具和有来源的记录，让解决问题的能力持续积累。</p></div></li>
+              </ol>
             </section>
           </div>
         )}
@@ -1468,6 +1352,28 @@ export default function Home() {
       </>}
 
       {activeWorkspace === "life" && <>
+      <section className="section tutorial-section" id="tutorials">
+        <div className="section-heading">
+          <div><p className="eyebrow">Practical tutorials</p><h2>教程不是告诉你“应该”，而是陪你把问题做完。</h2></div>
+          <p className="section-lead">从网络与隐私、内容搜集到来源表格，每篇都保留步骤、适用边界和可核对来源。新内容可通过本地发布工具直接维护。</p>
+        </div>
+        <div className="tutorial-filters" aria-label="教程分类">
+          {tutorialCategories.map((category) => <button type="button" className={tutorialCategory === category ? "filter-chip active" : "filter-chip"} key={category} onClick={() => setTutorialCategory(category)}>{category}</button>)}
+        </div>
+        <div className="tutorial-layout">
+          <aside className="tutorial-list" aria-label="教程列表">
+            {visibleTutorials.map((tutorial) => <button type="button" className={selectedTutorial?.id === tutorial.id ? "tutorial-card active" : "tutorial-card"} key={tutorial.id} onClick={() => setSelectedTutorialId(tutorial.id)}><span>{tutorial.category} · {tutorial.updatedAt}</span><strong>{tutorial.title}</strong><p>{tutorial.summary}</p><small>{tutorial.tags.join(" · ")}</small></button>)}
+          </aside>
+          {selectedTutorial && <article className="tutorial-reader">
+            <div className="tutorial-reader-head"><span>{selectedTutorial.category}</span><time>更新于 {selectedTutorial.updatedAt}</time></div>
+            <h2>{selectedTutorial.title}</h2><p className="tutorial-summary">{selectedTutorial.summary}</p>
+            <TutorialBody content={selectedTutorial.content} />
+            {selectedTutorial.sources.length > 0 && <div className="tutorial-sources"><strong>资料来源</strong>{selectedTutorial.sources.map((source) => <a href={source.href} key={source.href} target="_blank" rel="noreferrer">{source.label} ↗</a>)}</div>}
+          </article>}
+        </div>
+        <details className="changelog-panel"><summary>查看教程更新日志</summary><div>{changelog.map((item) => <article key={`${item.date}-${item.title}`}><time>{item.date}</time><strong>{item.title}</strong><p>{item.detail}</p></article>)}</div></details>
+      </section>
+
       <section className="section article-section" id="articles">
         <div className="section-heading"><div><p className="eyebrow">Column answers</p><h2>从一个问题开始，读一篇能带走的回答。</h2></div><div className="article-tools"><label className="search-field"><span>搜索专栏</span><input type="search" placeholder="输入关键词" value={articleQuery} onChange={(event) => setArticleQuery(event.target.value)} /></label><button type="button" className={selectedColumn === "all" ? "filter-chip active" : "filter-chip"} onClick={() => setSelectedColumn("all")}>全部</button></div></div>
         <div className="article-filter">{columns.map((column) => <button type="button" className={selectedColumn === column.key ? "filter-chip active" : "filter-chip"} key={column.key} onClick={() => setSelectedColumn(column.key)}>{column.label}</button>)}</div>
@@ -1485,20 +1391,21 @@ export default function Home() {
       <section className="section brand-data-section" id="brand-data">
         <div className="section-heading">
           <div><p className="eyebrow">Brand price watch</p><h2>先看品牌价位，再用自己的成交金额计算。</h2></div>
-          <p className="section-lead">下面是五个代表品牌与车型的官方公开价位样本，不是实时成交报价，也不替你决定车型。价格和权益会变化，点击来源可回到官方页面核对。</p>
+          <p className="section-lead">下面整理十条品牌线与代表车型的官方公开价位样本。蔚来公司旗下 NIO、ONVO 乐道、firefly 萤火虫集中展示；价格和权益会变化，请回到官方来源核对。</p>
         </div>
         <div className="brand-stat-grid" aria-label="品牌样本统计">
-          <div><span>跟踪品牌</span><strong>5</strong><small>个代表品牌</small></div>
-          <div><span>整车价位样本</span><strong>13.98–33.95</strong><small>万元</small></div>
+          <div><span>跟踪品牌线</span><strong>10</strong><small>覆盖主流新能源品牌</small></div>
+          <div><span>价位样本</span><strong>7.98–37.98</strong><small>万元，含 BaaS 起价</small></div>
           <div><span>计算方式</span><strong>开放输入</strong><small>不再绑定车型</small></div>
           <div><span>本次核对</span><strong>2026.08</strong><small>最终以官方为准</small></div>
         </div>
         <div className="brand-table-wrap">
           <table className="brand-price-table">
-            <thead><tr><th>品牌</th><th>代表车型</th><th>官方公开价位样本</th><th>购车结构</th><th>来源</th><th>计算</th></tr></thead>
+            <thead><tr><th>品牌归属</th><th>品牌</th><th>车型样本</th><th>官方公开价位样本</th><th>购车结构</th><th>来源</th><th>计算</th></tr></thead>
             <tbody>
               {brandReferences.map((brand) => (
                 <tr key={brand.key}>
+                  <td><span className={brand.group === "蔚来公司" ? "brand-group nio" : "brand-group"}>{brand.group}</span></td>
                   <td><strong>{brand.name}</strong></td>
                   <td>{brand.representative}</td>
                   <td>{brand.price}</td>
@@ -1510,7 +1417,23 @@ export default function Home() {
             </tbody>
           </table>
         </div>
-        <p className="brand-data-note">口径说明：价位表只做横向观察；贷款本金始终以你在下方填写的“购车金额”为准。按当前产品规则，仅“蔚来 NIO”显示租电方案输入，租电减免不会自动带入。</p>
+        <p className="brand-data-note">口径说明：价位表只做横向观察，贷款本金始终以你填写的“购车金额”为准。蔚来公司旗下三个品牌可打开 BaaS 输入，租电减免和月租都不会自动带入。</p>
+      </section>
+
+      <section className="section car-journey-section" id="car-journey">
+        <div className="section-heading"><div><p className="eyebrow">Buyer journey & notes</p><h2>从打算买车到长期使用，记录都放在汽车专区。</h2></div><p className="section-lead">点击横向阶段会筛选相关记录；交付后的补能、售后与长期服务也在同一区域，不再占用随心记录。</p></div>
+        <div className="journey-dashboard">
+          <section className="timeline-card" id="journey">
+            <div className="timeline-head"><div><p className="eyebrow">Buyer journey</p><h3>购车全周期</h3></div><button type="button" className={selectedStage === "all" ? "filter-chip active" : "filter-chip"} onClick={() => chooseStage("all")}>全部阶段</button></div>
+            <div className="journey-scroll" tabIndex={0} aria-label="横向浏览买车阶段"><ol className="journey-list">{purchaseStages.map((item) => <li key={item.step} className={selectedStage === item.key ? "active" : ""}><button type="button" aria-pressed={selectedStage === item.key} onClick={() => chooseStage(item.key)}><span>{item.step}</span><strong>{item.title}</strong></button></li>)}</ol></div>
+            <div className="journey-active-note" aria-live="polite"><span>{activePurchaseStage ? `阶段 ${activePurchaseStage.step}` : "全部阶段"}</span><strong>{activePurchaseStage?.title ?? "完整购车路径"}</strong><p>{activePurchaseStage?.note ?? "按自己的节奏了解、比较、计算、下单与长期使用。"}</p></div>
+          </section>
+          <section className="delivery-card compact-delivery-card"><p className="eyebrow">Ownership service</p><h3>交付后的用车生命周期</h3><p>交付不是结束。补能、售后、救援、软件升级与日常使用支持，都会影响长期体验和真实成本。</p><ul>{deliveryServices.map((item) => <li key={item}>{item}</li>)}</ul></section>
+        </div>
+        <div className="car-record-layout">
+          <aside className="car-record-list">{carRecords.map((record) => <button type="button" className={selectedCarRecord.id === record.id ? "active" : ""} key={record.id} onClick={() => setSelectedCarRecordId(record.id)}><span>{record.date}</span><strong>{record.title}</strong></button>)}{carRecords.length === 0 && <p className="empty-state">这个阶段暂无记录，可先查看完整周期。</p>}</aside>
+          <article className="daily-entry car-daily-entry"><div className="daily-meta"><span>{selectedCarRecord.date}</span><span>{purchaseStages.find((stage) => stage.key === selectedCarRecord.stage)?.title ?? "汽车记录"}</span></div><h3>{selectedCarRecord.title}</h3>{selectedCarRecord.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}<div className="daily-takeaway"><span>记录结论</span><strong>{selectedCarRecord.takeaway}</strong></div></article>
+        </div>
       </section>
 
       </>}
@@ -1524,21 +1447,6 @@ export default function Home() {
           <p className="section-lead">
             直接填写品牌、购车金额和首付比例。页面仍分成贷款金融、税费保险与首次付款、月持有及持有年限费用三个步骤，最终以实际报价、金融审批和合同为准。
           </p>
-        </div>
-
-        <div className="finance-presets" aria-label="金融方案快捷填入">
-          {financePresets.filter((preset) => selectedBrand === "nio" || preset.key === "custom").map((preset) => (
-            <button
-              type="button"
-              className={financePlan === preset.key ? "finance-card active" : "finance-card"}
-              key={preset.label}
-              onClick={() => applyFinancePreset(preset)}
-            >
-              <span>{preset.label}</span>
-              <strong>{preset.badge}</strong>
-              <small>{preset.note}</small>
-            </button>
-          ))}
         </div>
 
         <div className="calculator-shell finance-shell">
@@ -1563,7 +1471,7 @@ export default function Home() {
 
             <div className="plan-summary-card">
               <p className="eyebrow">Plan summary</p>
-              <h3>{selectedFinancePlan.label}</h3>
+              <h3>用户自定义贷款方案</h3>
               <p>{planDescription}</p>
               <div className="plan-summary-meta">
                 <span>计价品牌：{currentBrandLabel}</span>
@@ -1574,21 +1482,11 @@ export default function Home() {
               <p className="input-help">结清期数只影响贷款成本；下方持有年限只影响用车与持有费用，两者已经分开。</p>
             </div>
 
-            {financePlan === "nio-five-year" && (
-              <label className="budget-input payoff-month-input">
-                <span>免 3 年后结清期数</span>
-                <input min="36" max="60" step="1" type="number" value={fiveYearPayoffMonth} onChange={(event) => setFiveYearPayoffMonth(Math.min(60, Math.max(36, Number(event.target.value) || 36)))} />
-                <small className="input-help">可填第 36–60 期；36 期结清通常不含后 24 期费用，60 期表示按完整 5 年还完。</small>
-              </label>
-            )}
-
-            {financePlan !== "nio-five-year" && (
-              <label className="budget-input payoff-month-input">
-                <span>计划结清期数</span>
-                <input min={Math.max(1, earlyPayoffEligibleMonth)} max={loanTermMonths} step="1" type="number" value={loanPayoffMonth} onChange={(event) => setLoanPayoffMonth(Math.min(loanTermMonths, Math.max(Math.max(1, earlyPayoffEligibleMonth), Number(event.target.value) || 1)))} />
-                <small className="input-help">只用于贷款结清测算，不会改变下方的持有年限。</small>
-              </label>
-            )}
+            <label className="budget-input payoff-month-input">
+              <span>计划结清期数</span>
+              <input min="1" max={loanTermMonths} step="1" type="number" value={loanPayoffMonth} onChange={(event) => setLoanPayoffMonth(Math.min(loanTermMonths, Math.max(1, Number(event.target.value) || 1)))} />
+              <small className="input-help">只用于贷款结清测算。是否允许提前结清以及违约金，请按你的合同确认。</small>
+            </label>
 
             <div className="control-grid finance-essential-grid">
               <label className="budget-input">
@@ -1602,23 +1500,22 @@ export default function Home() {
               </label>
             </div>
 
-            {financePlan === "custom" && (
-              <div className="control-grid custom-finance-grid">
+            <div className="control-grid custom-finance-grid">
                 <label className="budget-input">
                   <span>分期年限（贷款合同）</span>
-                  <input min="0" max="8" step="1" type="number" value={financeYears === 0 ? "" : financeYears} onChange={(event) => { switchToCustomPlan(); setFinanceYears(Math.min(8, Math.max(0, Number(event.target.value) || 0))); }} />
+                  <input min="0" max="8" step="1" type="number" value={financeYears === 0 ? "" : financeYears} onChange={(event) => { const years = Math.min(8, Math.max(0, Number(event.target.value) || 0)); setFinanceYears(years); setLoanPayoffMonth(Math.max(1, years * 12)); }} />
                 </label>
                 <label className="budget-input">
-                  <span>方案标示年化费率</span>
-                  <input min="0" max="24" step="0.1" type="number" value={annualRate === 0 ? "" : annualRate} onChange={(event) => { switchToCustomPlan(); setAnnualRate(Math.min(24, Math.max(0, Number(event.target.value) || 0))); }} />
+                  <span>年化利率（合同口径）</span>
+                  <input min="0" max="24" step="0.1" type="number" value={annualRate === 0 ? "" : annualRate} onChange={(event) => setAnnualRate(Math.min(24, Math.max(0, Number(event.target.value) || 0)))} />
+                  <small className="input-help">直接填写金融机构明示的年化利率；不同品牌与时期的方案由你按实际合同输入。</small>
                 </label>
               </div>
-            )}
 
-            {selectedBrand === "nio" && (
+            {nioGroupBrands.includes(selectedBrand) && (
               <div className="nio-baas-panel">
                 <div className="control-group">
-                  <span className="control-label">蔚来购买方式</span>
+                  <span className="control-label">蔚来公司品牌购买方式</span>
                   <div className="segmented">
                     <button type="button" className={purchaseMode === "vehicle" ? "active" : ""} onClick={() => switchPurchaseMode("vehicle")}>整车购买</button>
                     <button type="button" className={purchaseMode === "baas" ? "active" : ""} onClick={() => switchPurchaseMode("baas")}>BaaS 电池租用</button>
@@ -1634,16 +1531,14 @@ export default function Home() {
               </div>
             )}
 
-            {financePlan === "custom" && (
-              <div className="control-group">
+            <div className="control-group">
                 <span className="control-label">金融方案</span>
                 <div className="segmented">
-                  <button type="button" className={financeMode === "equal-payment" ? "active" : ""} onClick={() => { switchToCustomPlan(); setFinanceMode("equal-payment"); }}>等额本息</button>
-                  <button type="button" className={financeMode === "equal-principal" ? "active" : ""} onClick={() => { switchToCustomPlan(); setFinanceMode("equal-principal"); }}>等额本金</button>
-                  <button type="button" className={financeMode === "interest-free" ? "active" : ""} onClick={() => { switchToCustomPlan(); setFinanceMode("interest-free"); setAnnualRate(0); }}>免息分期</button>
+                  <button type="button" className={financeMode === "equal-payment" ? "active" : ""} onClick={() => setFinanceMode("equal-payment")}>等额本息</button>
+                  <button type="button" className={financeMode === "equal-principal" ? "active" : ""} onClick={() => setFinanceMode("equal-principal")}>等额本金</button>
+                  <button type="button" className={financeMode === "interest-free" ? "active" : ""} onClick={() => { setFinanceMode("interest-free"); setAnnualRate(0); }}>免息分期</button>
                 </div>
               </div>
-            )}
 
             <details className="calculator-details bill-details">
               <summary>账单信息（可选）</summary>
@@ -1671,7 +1566,6 @@ export default function Home() {
 
             <div className="total-interest-summary">
               <div><span>按当前结清期数的总利息</span><strong>{formatPrice(interestPaidThroughSettlement)}</strong></div>
-              {financePlan === "nio-five-year" && <div><span>满 60 期总利息</span><strong>{formatPrice(loanQuote.totalInterest)}</strong><small>贷款金额 × 3% × 2 年</small></div>}
             </div>
 
             <div className="finance-tab-list" role="tablist" aria-label="金融结果切换">
@@ -1691,9 +1585,7 @@ export default function Home() {
                   <div className="irr-metric"><span>综合年化融资成本（IRR）</span><strong>{formatIrr(loanIrrPercent)}</strong></div>
                 </div>
                 <p className="input-help irr-note">
-                  {financePlan === "nio-five-year"
-                    ? "5.64% 是 3% 平息费率的参考折算年化，不等同于任意结清期数下的实际 IRR。综合年化融资成本仍按贷款本金、相关费用与每期还款现金流反推；最终以金融机构明示表和合同为准。"
-                    : "综合年化融资成本按贷款本金、相关费用与每期还款现金流反推，更适合比较不同方案；最终以金融机构明示表和合同为准。"}
+                  综合年化融资成本按贷款本金、相关费用与每期还款现金流反推，更适合比较不同方案；最终以金融机构明示表、提前结清规则和合同为准。
                 </p>
               </>
             ) : (
@@ -1872,7 +1764,7 @@ export default function Home() {
               <h3>计算口径</h3>
               <p>等额本息：月供 = 本金 × 月利率 × (1 + 月利率)^期数 ÷ [(1 + 月利率)^期数 - 1]。</p>
               <p>等额本金：每月偿还固定本金，利息按剩余本金递减。免息分期：贷款本金 ÷ 分期期数。</p>
-              <p>购置税估算：含税成交价先按增值税折算率还原为不含税计税价，再按所选税收口径估算。蔚来 NIO 的 BaaS 减免由用户手动填写，月租作为长期月度成本单独展示。</p>
+              <p>购置税估算：含税成交价先按增值税折算率还原为不含税计税价，再按所选税收口径估算。蔚来公司品牌的 BaaS 减免由用户手动填写，月租作为长期月度成本单独展示。</p>
               <p>综合年化融资成本采用 IRR 复利口径，默认把金融服务费视为放款当期由借款人承担的贷款相关费用。<a href="https://xining.pbc.gov.cn/goutongjiaoliu/113456/113469/2025092212551432728/index.html" target="_blank" rel="noreferrer">查看中国人民银行口径 →</a></p>
             </section>
           </div>
@@ -1970,6 +1862,11 @@ export default function Home() {
           </aside>
         )}
       </section>}
+
+      <footer className="site-footer">
+        <div><strong>周多福个人工作室</strong><span>教程 · 记录 · 开放工具</span></div>
+        <p>累计访问 <strong>{visitCount === null ? "—" : new Intl.NumberFormat("zh-CN").format(visitCount)}</strong> 次 · 仅统计总访问次数，不记录访客身份</p>
+      </footer>
 
       {authOpen && (
         <div className="auth-backdrop" role="presentation" onMouseDown={() => setAuthOpen(false)}>
