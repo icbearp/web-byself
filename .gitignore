@@ -42,6 +42,3 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
-
-# local unpublished drafts from the content editor
-/content/drafts.local.json

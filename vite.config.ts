@@ -6,8 +6,7 @@ import { sites } from "./build/sites-vite-plugin";
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
 
-const { d1, d1_database_id: configuredD1DatabaseId, r2 } = hostingConfig;
-const d1DatabaseId = process.env.D1_DATABASE_ID ?? configuredD1DatabaseId ?? SITE_CREATOR_PLACEHOLDER_DATABASE_ID;
+const { d1, r2 } = hostingConfig;
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -20,7 +19,7 @@ const localBindingConfig = {
         {
           binding: d1,
           database_name: "site-creator-d1",
-          database_id: d1DatabaseId,
+          database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
         },
       ]
     : [],
