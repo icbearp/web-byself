@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render() {
@@ -30,8 +30,10 @@ test("server-renders the structured personal homepage", async () => {
 
   const html = await response.text();
   assert.match(html, /周多福/);
-  assert.match(html, /四个长期栏目/);
-  assert.match(html, /讲清楚价格和边界/);
+  assert.match(html, /先看四个专栏/);
+  assert.match(html, /关于我/);
+  assert.match(html, /内容专栏/);
+  assert.match(html, /服务范围/);
   assert.match(html, /每日记录/);
   assert.match(html, /购车与车型/);
   assert.match(html, /金融计算/);
@@ -45,4 +47,30 @@ test("keeps generated lifestyle imagery local to the site", async () => {
     access(new URL("../public/images/family-planning.png", import.meta.url)),
     access(new URL("../public/images/efficiency-desk.png", import.meta.url)),
   ]);
+});
+
+test("keeps the primary navigation fixed and the buyer journey interactive", async () => {
+  const [pageSource, styles] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(styles, /\.site-header\s*\{[\s\S]*?position:\s*fixed;/);
+  assert.match(styles, /\.journey-list\s*\{[\s\S]*?grid-template-columns:\s*repeat\(10,/);
+  assert.match(pageSource, /aria-label="横向浏览买车阶段"/);
+  assert.match(pageSource, /aria-pressed=\{selectedStage === item\.key\}/);
+});
+
+test("separates loan finance, first payment, and ownership-cost inputs", async () => {
+  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pageSource, />贷款金融</);
+  assert.match(pageSource, />税费、保险与首次付款</);
+  assert.match(pageSource, />月持有与持有年限费用</);
+  assert.match(pageSource, /firstPaymentAmount/);
+  assert.match(pageSource, /loanPayoffMonth/);
+  assert.match(pageSource, /monthlyOwnershipCost/);
+  assert.match(pageSource, /贷款金额 × 3% × 2 年/);
+  assert.match(pageSource, /5\.64% 参考年化/);
+  assert.match(pageSource, /只用于贷款结清测算，不会改变下方的持有年限/);
 });
