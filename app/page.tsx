@@ -1,36 +1,41 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { calculateAnnualizedIrr, calculateFiveYearFreeThreeTotalInterest } from "./finance-math";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import tutorialsData from "../content/tutorials.json";
+import changelogData from "../content/changelog.json";
+import publishedRecordsData from "../content/records.json";
+import { calculateAnnualizedIrr } from "./finance-math";
 
-type ModelKey = "l60" | "l80" | "l90";
 type PurchaseMode = "vehicle" | "baas";
-type ScenarioKey = "commute" | "kids" | "travel" | "parents";
-type ColumnKey = "car" | "efficiency" | "information" | "life";
+type BrandKey = "nio" | "onvo" | "firefly" | "tesla" | "xiaomi" | "byd" | "li" | "geely" | "aito" | "xpeng" | "other";
+type ColumnKey = "tools" | "efficiency" | "information" | "life";
 type RecordCategoryKey = "car-info" | "career-growth" | "life-efficiency" | "side-project";
 type StageKey = "plan" | "online" | "offline" | "compare" | "experience" | "budget" | "communication" | "order" | "delivery" | "ownership";
 type FinanceMode = "equal-payment" | "equal-principal" | "interest-free";
 type PurchaseTaxMode = "new-energy" | "regular";
-type FinancePlanKey = "nio-five-year" | "nio-seven-year" | "custom";
-type WorkspaceKey = "home" | "records" | "car" | "finance" | "life";
+type FinancePlanKey = "custom";
+type WorkspaceKey = "home" | "records" | "car" | "life";
 type HomeViewKey = "about" | "columns";
-
-type Trim = {
-  name: string;
-  vehiclePrice: number;
-  baasPrice: number;
-  tag: string;
-  bestFor: string;
-};
-
-type KnownOption = {
+type FeedbackType = "suggestion" | "question" | "experience";
+type AuthUser = { id: string; email: string; role: string };
+type AdminFeedbackItem = { id: number; type: string; message: string; contact: string; page: string; status: string; createdAt: string; userEmail?: string | null };
+type AdminBillItem = { id: string; title: string; createdAt: string; userEmail?: string | null; snapshot: FinanceBillSnapshot };
+type ContentComment = {
   id: string;
-  label: string;
-  price: number;
-  note: string;
-  models: ModelKey[];
-  excludedTrim?: string;
+  contentType: "tutorial" | "record" | "article";
+  contentId: string;
+  contentTitle: string;
+  category: string;
+  message: string;
+  authorName: string;
+  anchorText: string;
+  anchorBlock: string;
+  parentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  status?: string;
 };
+type AdminCommentItem = ContentComment & { userId?: string | null; status: string };
 
 type Column = {
   key: ColumnKey;
@@ -56,6 +61,18 @@ type EfficiencyNote = {
   steps: string[];
 };
 
+type Tutorial = {
+  id: string;
+  title: string;
+  summary: string;
+  category: string;
+  tags: string[];
+  publishedAt: string;
+  updatedAt: string;
+  content: string;
+  sources: Array<{ label: string; href: string }>;
+};
+
 type DailyRecord = {
   id: string;
   date: string;
@@ -65,6 +82,10 @@ type DailyRecord = {
   title: string;
   paragraphs: string[];
   takeaway: string;
+  content?: string;
+  publishedAt?: string;
+  updatedAt?: string;
+  sources?: Array<{ label: string; href: string }>;
 };
 
 type LoanQuote = {
@@ -79,19 +100,17 @@ type LoanQuote = {
 };
 
 type FinanceFormState = {
-  selectedModel: ModelKey;
-  selectedTrim: string;
+  selectedBrand?: BrandKey;
+  batteryReduction?: number;
   purchaseMode: PurchaseMode;
   financePlan: FinancePlanKey;
   financeMode: FinanceMode;
   purchaseTaxMode: PurchaseTaxMode;
   manualVehiclePrice: number;
-  selectedOptions: string[];
-  customBudget: number;
   downPaymentRate: number;
   financeYears: number;
   annualRate: number;
-  fiveYearPayoffMonth: number;
+  fiveYearPayoffMonth?: number;
   loanPayoffMonth: number;
   ownershipYears: number;
   vatRate: number;
@@ -150,19 +169,18 @@ type SavedFinanceBill = {
 };
 
 const workspaceTabs: Array<{ key: WorkspaceKey; label: string; description: string }> = [
-  { key: "home", label: "首页", description: "认识周多福与四个长期栏目" },
-  { key: "records", label: "每日记录", description: "按日期、标签和购车阶段回看" },
-  { key: "car", label: "购车与车型", description: "乐道车型、家庭场景与官方信息" },
-  { key: "finance", label: "金融计算", description: "落地成本、月供、BaaS 与账单" },
-  { key: "life", label: "效率生活", description: "职场成长、效率方法与业余沉淀" },
+  { key: "home", label: "首页", description: "个人选择、长期内容与开放工具" },
+  { key: "life", label: "生活效率", description: "实用教程、问题解法与效率方法" },
+  { key: "records", label: "随心记录", description: "不追求日更，记录值得留下的判断" },
+  { key: "car", label: "汽车数据与金融", description: "品牌价格参考、贷款与持有成本" },
 ];
 
 const profile = {
   name: "周多福",
-  role: "乐道购车顾问 / 生活方式记录者",
+  role: "独立内容创作者 / 工具实践者",
   intro:
-    "我把真实的工作经验、购车判断和日常效率整理成容易使用的内容。这里不急着说服你，而是帮你把问题问清楚，再做适合自己的选择。",
-  promise: ["讲清楚价格和边界", "尊重每个家庭的生活方式", "把能复用的方法留下来"],
+    "我把真实经历、个人判断和实用工具整理成一间长期更新的个人工作室。这里不代表任何品牌，内容尽量给出步骤、口径和来源，帮助你自己完成判断。",
+  promise: ["保持独立判断", "尊重工作与生活的边界", "把能复用的方法留下来"],
 };
 
 const contactMethods = [
@@ -197,9 +215,9 @@ const recordCollections: Array<{
   },
   {
     key: "career-growth",
-    label: "职场成长",
-    title: "把销售、沟通和长期信任做成可复用的方法",
-    intro: "沉淀顾问式销售、用户关系、表达方式、复盘习惯和个人成长，服务自己的职业积累。",
+    label: "职场与选择",
+    title: "看清边界、保护权益，也为下一段路积累能力",
+    intro: "记录真实职场、劳动权益、沟通方法、离开与重新开始，让选择建立在事实和长期生活之上。",
   },
   {
     key: "life-efficiency",
@@ -215,20 +233,7 @@ const recordCollections: Array<{
   },
 ];
 
-const dailyRecords: DailyRecord[] = [
-  {
-    id: "2026-07-29-content-collections",
-    date: "2026-07-29",
-    category: "career-growth",
-    tags: ["#网站整理", "#内容集合", "#长期积累"],
-    title: "内容不是越堆越多，而是要慢慢长成清晰的集合",
-    paragraphs: [
-      "今天重新看这个独立站，我意识到每日记录不能只是往下堆。前两篇记录一多，页面就会变长；以后如果持续更新几十篇、上百篇，访客反而更难找到真正需要的内容。",
-      "所以网站需要从“流水账”变成“内容集合”：按日期能回看当天记录，按话题能看同一类经验，按买车阶段能直接进入当前最相关的问题。这样首页保持简洁，但内容不会被折叠到没人看见。",
-      "这件事也很像做用户服务。用户不需要我把所有信息一次性倒给他，而是需要在合适的阶段看到合适的内容。好的整理，本质上是在降低对方理解和决策的成本。",
-    ],
-    takeaway: "长期内容要有分类、有路径、有入口；不是让页面显得很多，而是让用户更快找到对自己有用的那一篇。",
-  },
+const builtInDailyRecords: DailyRecord[] = [
   {
     id: "2026-07-24-first-car-stage",
     date: "2026-07-24",
@@ -260,6 +265,9 @@ const dailyRecords: DailyRecord[] = [
   },
 ];
 
+const dailyRecords: DailyRecord[] = [...(publishedRecordsData as DailyRecord[]), ...builtInDailyRecords]
+  .sort((first, second) => second.date.localeCompare(first.date));
+
 const purchaseStages: Array<{ key: StageKey; step: string; title: string; note: string }> = [
   { key: "plan", step: "01", title: "初买车打算", note: "先确认自己为什么要买车，是否真的需要换车或新增一台。" },
   { key: "online", step: "02", title: "网上了解", note: "看官网、口碑、测评和政策，先建立基础认知。" },
@@ -282,10 +290,10 @@ const deliveryServices = [
 
 const columns: Column[] = [
   {
-    key: "car",
-    label: "乐道 / 蔚来购车",
-    title: "从用车场景出发，而不是从配置表出发",
-    copy: "把通勤、家庭、预算、补能和保值预期放在一起，讲清楚适合与不适合。",
+    key: "tools",
+    label: "独立工具",
+    title: "把复杂问题拆成可以亲手验证的数字",
+    copy: "从金融成本到长期预算，保留开放输入、清楚口径和可导出的结果。",
     image: "/images/family-planning.png",
   },
   {
@@ -313,12 +321,12 @@ const columns: Column[] = [
 
 const articles: Article[] = [
   {
-    id: "car-fit",
-    column: "car",
-    title: "怎样判断一辆车是否适合你的真实生活？",
-    excerpt: "先不看配置表，先把每天的路线、停车、家庭成员和长途频率列出来。",
-    body: "车不是一张参数成绩单，而是每天都要参与生活的工具。判断一台车，先从最常发生的场景开始，再看空间、补能、舒适和预算能不能一起成立。",
-    points: ["先记录一周真实出行，而不是凭想象买车", "把最常坐车的人放进决策中心", "把整车购买、BaaS 和长期用车成本分开算"],
+    id: "problem-to-proof",
+    column: "tools",
+    title: "怎样把一个复杂问题拆成可验证的步骤？",
+    excerpt: "先定义想得到的结果，再把事实、假设、计算和行动分开。",
+    body: "复杂问题常常不是缺少答案，而是多个口径混在一起。先写清目标与限制，再分别收集事实、标记假设、完成计算，最后列出下一步；每一层都能单独检查，结论才更可靠。",
+    points: ["用一句话定义问题和需要的输出", "把已经确认的事实与暂时假设分开", "让每个数字都有来源，让每个行动都有下一步"],
   },
   {
     id: "ai-workflow",
@@ -367,125 +375,36 @@ const efficiencyNotes: EfficiencyNote[] = [
   },
 ];
 
-const models: Record<
-  ModelKey,
-  {
-    name: string;
-    subtitle: string;
-    headline: string;
-    image: string;
-    visualNote: string;
-    officialUrl: string;
-    sourceLabel: string;
-    trims: Trim[];
-    highlights: string[];
-    lifestyle: string;
-    advisorNote: string;
-  }
-> = {
-  l60: {
-    name: "乐道 L60",
-    subtitle: "家庭智能电动 SUV",
-    headline: "适合把通勤、接送、周末出游放在同一辆车里解决的家庭。",
-    image: "/images/home-hero.png",
-    visualNote: "家庭出行场景参考",
-    officialUrl: "https://www.onvo.cn/l60",
-    sourceLabel: "官网车型页与焕新信息",
-    trims: [
-      { name: "Pro", vehiclePrice: 192800, baasPrice: 135800, tag: "入门够用", bestFor: "预算清晰、主要城市通勤和短途家庭出行。" },
-      { name: "Max", vehiclePrice: 202800, baasPrice: 145800, tag: "均衡推荐", bestFor: "想要更完整舒适体验，又不追求一步到顶。" },
-      { name: "Ultra", vehiclePrice: 222800, baasPrice: 165800, tag: "配置拉满", bestFor: "经常带家人长途，重视后排陪伴和娱乐体验。" },
-    ],
-    highlights: ["全系基于 900V 高压架构，主打更高效的补能和能耗表现。", "后排舒享娱乐套装在 Ultra 版标配，Pro/Max 可按需求选装。", "更像一台日常家用车：重点不是炫参数，而是接送、购物、露营都少折腾。"],
-    lifestyle: "如果你每天在城市里跑固定路线，周末偶尔带孩子去近郊，L60 是最容易解释预算的一台。",
-    advisorNote: "先把停车位、常坐人数、后排娱乐需求问清楚，再决定 Pro、Max 或选装。",
-  },
-  l80: {
-    name: "乐道 L80",
-    subtitle: "智能双舱大五座旗舰 SUV",
-    headline: "给重视空间、装载和舒适体验的五口之家准备的大五座方案。",
-    image: "/images/family-planning.png",
-    visualNote: "家庭装载场景参考",
-    officialUrl: "https://www.onvo.cn/l80",
-    sourceLabel: "官网车型页与上市信息",
-    trims: [
-      { name: "Pro", vehiclePrice: 242800, baasPrice: 156800, tag: "大五座入门", bestFor: "刚需大五座空间，但预算仍希望可控。" },
-      { name: "Max", vehiclePrice: 259800, baasPrice: 173800, tag: "家庭主力", bestFor: "多数家庭最值得重点试驾的版本。" },
-      { name: "Ultra", vehiclePrice: 279800, baasPrice: 193800, tag: "高配舒适", bestFor: "老人孩子常坐第二排，长途舒适优先。" },
-    ],
-    highlights: ["官方定位智能双舱大五座旗舰 SUV，重点解决空间与装载的日常痛点。", "双舱空间适合家庭采购、亲子出行、骑行和露营装备。", "BaaS 方案门槛明显下降，适合先算首付压力再看长期用车成本。"],
-    lifestyle: "L80 不只是变大，而是把婴儿车、骑行装备、露营用品和日常采购都装得更从容。",
-    advisorNote: "试驾时重点体验前备舱、后备舱、二排舒适度和装载灵活性，模拟一次真实家庭出行。",
-  },
-  l90: {
-    name: "乐道 L90",
-    subtitle: "家庭旗舰大三排 SUV",
-    headline: "适合把车当成家庭移动客厅，也在意体面、空间和长途效率的人。",
-    image: "/images/family-planning.png",
-    visualNote: "多人出行场景参考",
-    officialUrl: "https://www.onvo.cn/l90",
-    sourceLabel: "官网车型页与上市信息",
-    trims: [
-      { name: "Pro", vehiclePrice: 265800, baasPrice: 179800, tag: "旗舰门槛", bestFor: "想要 L90 空间气场，预算也要稳住。" },
-      { name: "Max", vehiclePrice: 289800, baasPrice: 193800, tag: "高频推荐", bestFor: "大家庭长途频率高，希望舒适和智能都更完整。" },
-      { name: "Ultra", vehiclePrice: 299800, baasPrice: 213800, tag: "一步到位", bestFor: "第二排体验、座舱氛围和家人满意度优先。" },
-    ],
-    highlights: ["官方强调“6 人 10 箱”和 240L 智能电动前备舱，适合多人满载旅行。", "提供六座或七座布局，适合二孩家庭、三代同堂和长途出行。", "更适合把全家人的舒适都放进决策，而不是只看驾驶者一个人的感受。"],
-    lifestyle: "如果你经常全家出远门，L90 会把座位、行李、老人舒适和孩子路上体验这些争论变少。",
-    advisorNote: "看 L90 时别只问最低价，要问满员满载是否舒服、停车是否有压力。",
-  },
-};
-
-const knownOptions: KnownOption[] = [
-  { id: "l60-rear-entertainment", label: "后排舒享娱乐套装", price: 10000, note: "该套装价格为 10,000 元；L60 Ultra 已标配。", models: ["l60"], excludedTrim: "Ultra" },
-];
-
-const financePresets: Array<{
-  key: FinancePlanKey;
-  label: string;
-  note: string;
-  badge: string;
-  downPaymentRate?: number;
-  termYears?: number;
-  annualRate?: number;
-  mode?: FinanceMode;
+const brandReferences: Array<{
+  key: Exclude<BrandKey, "other">;
+  group: string;
+  name: string;
+  representative: string;
+  price: string;
+  structure: string;
+  officialUrl: string;
+  sourceDate: string;
 }> = [
-  {
-    key: "nio-five-year",
-    label: "官方 5 年免 3 年利息",
-    note: "前 3 年 0 费；后 2 年按原贷款金额 × 3% × 2 年计算总利息。",
-    badge: "0% / 3%",
-    downPaymentRate: 0,
-    termYears: 5,
-    annualRate: 3,
-  },
-  {
-    key: "nio-seven-year",
-    label: "官方 7 年超低息",
-    note: "年化费率 0.99%，三个月后可申请一次性还清。",
-    badge: "0.99%",
-    downPaymentRate: 20,
-    termYears: 7,
-    annualRate: 0.99,
-  },
-  {
-    key: "custom",
-    label: "高自由度自定义",
-    note: "自己填首付、年限、费率、月供方式，适合做个人测算。",
-    badge: "自由填写",
-    downPaymentRate: 30,
-    termYears: 5,
-    annualRate: 3.5,
-    mode: "equal-payment",
-  },
+  { key: "nio", group: "蔚来公司", name: "NIO 蔚来", representative: "ET5 / ET5T / ES6 / EC6 / ET9", price: "整车 ¥29.80 万起；BaaS ¥22.80 万起", structure: "纯电；支持换电与 BaaS 手动输入", officialUrl: "https://www.nio.com/news/20250525001", sourceDate: "官方发布 2025-05" },
+  { key: "onvo", group: "蔚来公司", name: "ONVO 乐道", representative: "L60 / L90", price: "L60 整车 ¥19.28 万起；BaaS ¥13.58 万起", structure: "纯电；支持换电与 BaaS 手动输入", officialUrl: "https://www.onvo.cn/news/20260611001", sourceDate: "官方发布 2026-06" },
+  { key: "firefly", group: "蔚来公司", name: "firefly 萤火虫", representative: "萤火虫 / halo 光之环", price: "整车 ¥11.98 万起；BaaS ¥7.98 万起", structure: "纯电小车；支持换电与 BaaS 手动输入", officialUrl: "https://www.firefly.com.cn/news/20260414001", sourceDate: "官方发布 2026-04" },
+  { key: "tesla", group: "独立品牌", name: "特斯拉", representative: "Model 3 / Model Y", price: "Model 3 ¥23.55–33.95 万", structure: "纯电；价格随版本与限时权益变化", officialUrl: "https://www.tesla.cn/model3/design", sourceDate: "官网核对 2026-08" },
+  { key: "xiaomi", group: "独立品牌", name: "小米汽车", representative: "SU7 / YU7", price: "新一代 SU7 ¥21.99–30.39 万", structure: "纯电；Standard / Pro / Max 样本", officialUrl: "https://www.mi.com/global/discover/article?id=6117", sourceDate: "官方发布 2026-03" },
+  { key: "byd", group: "比亚迪集团", name: "比亚迪", representative: "秦 / 宋 / 海豹 / 海狮", price: "海豹 07 DM-i ¥13.98–19.58 万", structure: "纯电与插混；大众新能源价位样本", officialUrl: "https://www.byd.com/cn/ocean-home/models/haibao/haibao-07-dm-i", sourceDate: "官网核对 2026-08" },
+  { key: "li", group: "独立品牌", name: "理想汽车", representative: "L6 / L7 / L8 / L9 / i8", price: "新 L6 ¥24.98 万起", structure: "增程与纯电；版本价格以配置页为准", officialUrl: "https://ir.lixiang.com/news-releases/news-release-details/li-auto-inc-launches-new-li-l6-versatile-all-wheel-drive-suv", sourceDate: "官方发布 2026-07" },
+  { key: "geely", group: "吉利集团", name: "吉利银河", representative: "E5 / 星愿 / M9", price: "银河 E5 ¥10.98–14.58 万", structure: "纯电与插混；代表车型公开指导价", officialUrl: "https://galaxy.geely.com/E5", sourceDate: "官网核对 2026-08" },
+  { key: "aito", group: "鸿蒙智行", name: "问界", representative: "M5 / M7 / M8 / M9", price: "新 M7 ¥29.98–37.98 万", structure: "增程与纯电；五座、六座版本不同", officialUrl: "https://aito.auto/model/m7-new/configuration/", sourceDate: "官网核对 2026-08" },
+  { key: "xpeng", group: "独立品牌", name: "小鹏汽车", representative: "MONA M03 / P7+ / G6 / G9", price: "MONA M03 ¥11.98–15.58 万", structure: "纯电；代表车型发布价样本", officialUrl: "https://www.xpeng.com/news/01919c4e3d0b918dc2b08a0282360019", sourceDate: "官方发布 2024-08" },
 ];
 
-const scenarios: Record<ScenarioKey, { label: string; title: string; model: ModelKey; story: string; checklist: string[] }> = {
-  commute: { label: "通勤 + 接送", title: "工作日像闹钟一样准时，车要帮你省心。", model: "l60", story: "每天固定路线上下班、接孩子、买菜，最怕停车难、补能焦虑和车机不好用。这个场景先看 L60，再判断是否需要后排娱乐套装。", checklist: ["车位尺寸", "每日通勤里程", "孩子是否常坐后排", "附近补能是否方便"] },
-  kids: { label: "二孩家庭", title: "不只多一个座位，而是少很多家庭摩擦。", model: "l90", story: "两个安全座椅、老人同乘、婴儿车和书包一起上车，L90 的六座或七座布局会比纸面参数更有说服力。试驾时一定要模拟真实座位分配。", checklist: ["6 座或 7 座", "第三排进出", "安全座椅位置", "满员后备厢"] },
-  travel: { label: "长途旅行", title: "长途不是拼忍耐，是让每个人都还有余量。", model: "l90", story: "一年有几次跨城、露营或返乡，车就不能只服务驾驶者。L90 的重点是满载空间、前备舱、二三排舒适和补能路线。", checklist: ["满载行李", "老人乘坐时长", "高速补能规划", "露营 / 运动装备"] },
-  parents: { label: "带父母出行", title: "好车感，往往来自上下车和坐久了不累。", model: "l80", story: "父母不一定关心智驾和算力，但会立刻感受到座椅、车内安静和上下车姿态。L80/L90 都值得看，先由车位和预算决定。", checklist: ["上下车便利", "第二排坐姿", "晕车敏感度", "空调和座椅舒适"] },
-};
+const brandOptions: Array<{ key: BrandKey; label: string }> = [
+  ...brandReferences.map((brand) => ({ key: brand.key, label: brand.name })),
+  { key: "other", label: "其他品牌" },
+];
+
+const tutorials = tutorialsData as Tutorial[];
+const changelog = changelogData as Array<{ date: string; title: string; detail: string }>;
+const nioGroupBrands: BrandKey[] = ["nio", "onvo", "firefly"];
 
 const formatPrice = (value: number) => new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", maximumFractionDigits: 0 }).format(value);
 
@@ -573,64 +492,6 @@ function calculateLoanQuote(principal: number, annualRate: number, months: numbe
   };
 }
 
-function calculateFlatFeeLoan(principal: number, months: number, annualFeeRate: number, years: number): LoanQuote {
-  const safeMonths = Math.max(1, Math.round(months));
-  const balanceStart = Math.max(0, principal);
-  const totalInterest = balanceStart * (annualFeeRate / 100) * years;
-  const monthlyPrincipal = balanceStart / safeMonths;
-  const monthlyFee = totalInterest / safeMonths;
-  let balance = balanceStart;
-  const remainingPrincipalByMonth = [balanceStart];
-  const principalPayments: number[] = [];
-  const monthlyPayments = Array.from({ length: safeMonths }, () => {
-    balance = Math.max(0, balance - monthlyPrincipal);
-    principalPayments.push(monthlyPrincipal);
-    remainingPrincipalByMonth.push(balance);
-    return monthlyPrincipal + monthlyFee;
-  });
-
-  return {
-    monthlyRate: annualFeeRate / 100 / 12,
-    monthlyPayments,
-    principalPayments,
-    remainingPrincipalByMonth,
-    totalPayment: balanceStart + totalInterest,
-    totalInterest,
-    firstPayment: monthlyPayments[0] ?? 0,
-    lastPayment: monthlyPayments[safeMonths - 1] ?? 0,
-  };
-}
-
-function calculateNioFiveYearQuote(principal: number): LoanQuote {
-  const safePrincipal = Math.max(0, principal);
-  const months = 60;
-  const freeMonths = 36;
-  const lowRateMonths = 24;
-  const monthlyPrincipal = safePrincipal / months;
-  const lowInterestTotal = calculateFiveYearFreeThreeTotalInterest(safePrincipal);
-  const lowMonthlyFee = lowInterestTotal / lowRateMonths;
-  let balance = safePrincipal;
-  const remainingPrincipalByMonth = [safePrincipal];
-  const principalPayments: number[] = [];
-  const monthlyPayments = Array.from({ length: months }, (_, index) => {
-    balance = Math.max(0, balance - monthlyPrincipal);
-    principalPayments.push(monthlyPrincipal);
-    remainingPrincipalByMonth.push(balance);
-    return index < freeMonths ? monthlyPrincipal : monthlyPrincipal + lowMonthlyFee;
-  });
-
-  return {
-    monthlyRate: 0,
-    monthlyPayments,
-    principalPayments,
-    remainingPrincipalByMonth,
-    totalPayment: safePrincipal + lowInterestTotal,
-    totalInterest: lowInterestTotal,
-    firstPayment: monthlyPayments[0] ?? 0,
-    lastPayment: monthlyPayments[months - 1] ?? 0,
-  };
-}
-
 const BILL_STORAGE_KEY = "zhouduofu-finance-bills-v2";
 
 function escapeHtml(value: string) {
@@ -658,15 +519,260 @@ function downloadText(filename: string, content: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
+function renderInlineMarkdown(value: string): ReactNode[] {
+  const tokens = value.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)]+\))/g);
+  return tokens.filter(Boolean).map((token, index) => {
+    const link = token.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
+    if (link) return <a href={link[2]} key={`${index}-${token}`} target="_blank" rel="noreferrer">{link[1]} ↗</a>;
+    if (token.startsWith("**") && token.endsWith("**")) return <strong key={`${index}-${token}`}>{token.slice(2, -2)}</strong>;
+    return token;
+  });
+}
+
+function TutorialBody({ content }: { content: string }) {
+  const lines = content.split("\n");
+  const blocks: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    const key = `${index}-${line.slice(0, 12)}`;
+    const image = line.match(/^!\[([^\]]*)\]\((https?:\/\/[^)]+)\)$/);
+    const hasTableHeader = line.includes("|") && /^\s*\|?[\s:|-]+\|[\s:|-]+/.test(lines[index + 1] ?? "");
+
+    if (hasTableHeader) {
+      const parseRow = (row: string) => row.replace(/^\s*\||\|\s*$/g, "").split("|").map((cell) => cell.trim());
+      const headers = parseRow(line);
+      const rows: string[][] = [];
+      index += 2;
+      while (index < lines.length && (lines[index] ?? "").includes("|")) {
+        rows.push(parseRow(lines[index] ?? ""));
+        index += 1;
+      }
+      blocks.push(<div className="tutorial-table-wrap" data-comment-block={`line-${index}`} key={key}><table><thead><tr>{headers.map((header, cellIndex) => <th key={`${header}-${cellIndex}`}>{renderInlineMarkdown(header)}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex}>{renderInlineMarkdown(row[cellIndex] ?? "")}</td>)}</tr>)}</tbody></table></div>);
+      continue;
+    }
+
+    if (!line.trim()) blocks.push(<span className="tutorial-space" key={key} />);
+    else if (image) blocks.push(<figure className="tutorial-image" data-comment-block={`line-${index}`} key={key}><img src={image[2]} alt={image[1]} loading="lazy" />{image[1] && <figcaption>{image[1]}</figcaption>}</figure>);
+    else if (line.startsWith("## ")) blocks.push(<h3 data-comment-block={`line-${index}`} key={key}>{renderInlineMarkdown(line.slice(3))}</h3>);
+    else if (line.startsWith("### ")) blocks.push(<h4 data-comment-block={`line-${index}`} key={key}>{renderInlineMarkdown(line.slice(4))}</h4>);
+    else if (line.startsWith("- ")) blocks.push(<p className="tutorial-list-line" data-comment-block={`line-${index}`} key={key}>• {renderInlineMarkdown(line.slice(2))}</p>);
+    else if (/^\d+\.\s/.test(line)) blocks.push(<p className="tutorial-list-line ordered" data-comment-block={`line-${index}`} key={key}>{renderInlineMarkdown(line)}</p>);
+    else if (line.startsWith("> ")) blocks.push(<blockquote data-comment-block={`line-${index}`} key={key}>{renderInlineMarkdown(line.slice(2))}</blockquote>);
+    else blocks.push(<p data-comment-block={`line-${index}`} key={key}>{renderInlineMarkdown(line)}</p>);
+    index += 1;
+  }
+
+  return <div className="tutorial-body">{blocks}</div>;
+}
+
+const commentCategoryLabels: Record<string, string> = {
+  question: "提问",
+  correction: "纠错",
+  addition: "补充",
+  experience: "经验",
+  suggestion: "建议",
+  reply: "回复",
+};
+
+function ContentDiscussion({
+  contentType,
+  contentId,
+  contentTitle,
+  authUser,
+  children,
+}: {
+  contentType: ContentComment["contentType"];
+  contentId: string;
+  contentTitle: string;
+  authUser: AuthUser | null;
+  children: ReactNode;
+}) {
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [comments, setComments] = useState<ContentComment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [category, setCategory] = useState("question");
+  const [message, setMessage] = useState("");
+  const [authorName, setAuthorName] = useState("");
+  const [anchorText, setAnchorText] = useState("");
+  const [anchorBlock, setAnchorBlock] = useState("");
+  const [replyTo, setReplyTo] = useState<ContentComment | null>(null);
+  const [website, setWebsite] = useState("");
+  const [submitState, setSubmitState] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [submitText, setSubmitText] = useState("");
+  const [selectionPoint, setSelectionPoint] = useState<{ left: number; top: number } | null>(null);
+
+  const loadComments = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const response = await fetch(`/api/comments?contentType=${encodeURIComponent(contentType)}&contentId=${encodeURIComponent(contentId)}`);
+      const payload = (await response.json()) as { comments?: ContentComment[]; error?: string };
+      if (!response.ok) throw new Error(payload.error || "讨论暂时无法读取。");
+      setComments(payload.comments ?? []);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "讨论暂时无法读取。");
+    } finally {
+      setLoading(false);
+    }
+  }, [contentType, contentId]);
+
+  useEffect(() => {
+    const initialRequest = window.setTimeout(() => void loadComments(), 0);
+    const reload = () => void loadComments();
+    window.addEventListener("content-comment-updated", reload);
+    return () => {
+      window.clearTimeout(initialRequest);
+      window.removeEventListener("content-comment-updated", reload);
+    };
+  }, [loadComments]);
+
+  useEffect(() => {
+    const clearSelectionAction = () => setSelectionPoint(null);
+    window.addEventListener("scroll", clearSelectionAction, true);
+    return () => window.removeEventListener("scroll", clearSelectionAction, true);
+  }, []);
+
+  function captureSelection() {
+    window.setTimeout(() => {
+      const selection = window.getSelection();
+      const surface = surfaceRef.current;
+      if (!selection || selection.isCollapsed || !surface || selection.rangeCount === 0) {
+        setSelectionPoint(null);
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      const node = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+        ? range.commonAncestorContainer as Element
+        : range.commonAncestorContainer.parentElement;
+      if (!node || !surface.contains(node)) {
+        setSelectionPoint(null);
+        return;
+      }
+      const quote = selection.toString().trim().replace(/\s+/g, " ").slice(0, 360);
+      if (quote.length < 2) {
+        setSelectionPoint(null);
+        return;
+      }
+      const block = node.closest("[data-comment-block]") as HTMLElement | null;
+      const rect = range.getBoundingClientRect();
+      setAnchorText(quote);
+      setAnchorBlock(block?.dataset.commentBlock ?? "selected-text");
+      setSelectionPoint({
+        left: Math.min(window.innerWidth - 132, Math.max(12, rect.left + rect.width / 2 - 58)),
+        top: Math.max(12, rect.top - 48),
+      });
+    }, 0);
+  }
+
+  function startAnnotation() {
+    setSelectionPoint(null);
+    setReplyTo(null);
+    window.getSelection()?.removeAllRanges();
+    window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 20);
+  }
+
+  function startReply(comment: ContentComment) {
+    setReplyTo(comment);
+    setAnchorText("");
+    setAnchorBlock("");
+    setCategory("reply");
+    window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 20);
+  }
+
+  async function submitComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitState("sending");
+    setSubmitText("");
+    try {
+      const response = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ contentType, contentId, contentTitle, category, message, authorName, anchorText, anchorBlock, parentId: replyTo?.id, website }),
+      });
+      const payload = (await response.json()) as { error?: string; reviewRequired?: boolean };
+      if (!response.ok) throw new Error(payload.error || "留言没有提交成功。");
+      setMessage("");
+      setAnchorText("");
+      setAnchorBlock("");
+      setReplyTo(null);
+      setCategory("question");
+      setSubmitState("success");
+      setSubmitText(payload.reviewRequired ? "已提交。审核公开后，会出现在这篇内容的讨论中。" : "回复已公开。感谢你让这篇内容更完整。 ");
+      if (!payload.reviewRequired) await loadComments();
+      window.dispatchEvent(new CustomEvent("content-comment-updated"));
+    } catch (error) {
+      setSubmitState("error");
+      setSubmitText(error instanceof Error ? error.message : "留言没有提交成功。");
+    }
+  }
+
+  const rootComments = comments.filter((comment) => !comment.parentId);
+  const repliesFor = (id: string) => comments.filter((comment) => comment.parentId === id);
+
+  return <>
+    <div className="commentable-surface" ref={surfaceRef} onPointerUp={captureSelection}>{children}</div>
+    {selectionPoint && <button className="selection-comment-button" type="button" style={{ left: selectionPoint.left, top: selectionPoint.top }} onClick={startAnnotation}>＋ 批注这段</button>}
+    <section className="content-discussion" aria-label={`${contentTitle}的讨论与批注`}>
+      <div className="discussion-heading">
+        <div><span>Discussion</span><h3>讨论与批注</h3><p>选中正文即可引用提问，也可以直接留下补充、纠错或经验。</p></div>
+        <strong>{comments.length}<small> 条公开互动</small></strong>
+      </div>
+
+      {comments.length > 0 && <div className="comment-rail" aria-label="横向浏览最新互动">
+        {comments.slice().reverse().map((comment) => <button type="button" key={`rail-${comment.id}`} onClick={() => document.getElementById(`comment-${comment.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+          <span>{commentCategoryLabels[comment.category] ?? "互动"} · {comment.authorName}</span>
+          <strong>{comment.anchorText ? `“${comment.anchorText}”` : comment.message}</strong>
+        </button>)}
+      </div>}
+
+      <div className="discussion-body">
+        <div className="comment-thread-list">
+          {loading && <p className="discussion-empty">正在读取讨论…</p>}
+          {!loading && loadError && <p className="discussion-empty error">{loadError}</p>}
+          {!loading && !loadError && rootComments.length === 0 && <p className="discussion-empty">暂时还没有公开讨论。你可以成为第一个留下具体问题的人。</p>}
+          {rootComments.map((comment) => <article className="comment-thread" id={`comment-${comment.id}`} key={comment.id}>
+            <div className="comment-meta"><span>{commentCategoryLabels[comment.category] ?? "互动"}</span><strong>{comment.authorName}</strong><time>{comment.createdAt.replace("T", " ").slice(0, 16)}</time></div>
+            {comment.anchorText && <blockquote><small>引用自本文</small>“{comment.anchorText}”</blockquote>}
+            <p>{comment.message}</p>
+            <button className="comment-reply-button" type="button" onClick={() => startReply(comment)}>回复这条</button>
+            {repliesFor(comment.id).map((reply) => <div className="comment-reply" id={`comment-${reply.id}`} key={reply.id}>
+              <div className="comment-meta"><span>回复</span><strong>{reply.authorName}</strong><time>{reply.createdAt.replace("T", " ").slice(0, 16)}</time></div>
+              <p>{reply.message}</p>
+            </div>)}
+          </article>)}
+        </div>
+
+        <form className="comment-form" ref={formRef} onSubmit={submitComment}>
+          <div className="comment-form-head"><span>{replyTo ? `回复 ${replyTo.authorName}` : anchorText ? "正在引用正文" : "留下问题或补充"}</span>{(replyTo || anchorText) && <button type="button" onClick={() => { setReplyTo(null); setAnchorText(""); setAnchorBlock(""); setCategory("question"); }}>取消引用</button>}</div>
+          {replyTo && <blockquote>“{replyTo.message.slice(0, 120)}”</blockquote>}
+          {!replyTo && anchorText && <blockquote>“{anchorText}”</blockquote>}
+          <div className="comment-form-grid">
+            <label><span>互动类型</span><select value={category} onChange={(event) => setCategory(event.target.value)} disabled={Boolean(replyTo)}><option value="question">提问</option><option value="correction">纠错</option><option value="addition">补充</option><option value="experience">经验</option><option value="suggestion">建议</option>{replyTo && <option value="reply">回复</option>}</select></label>
+            {authUser?.role !== "admin" && <label><span>显示昵称（选填）</span><input maxLength={40} value={authorName} onChange={(event) => setAuthorName(event.target.value)} placeholder={authUser ? "默认显示为注册读者" : "默认显示为匿名读者"} /></label>}
+          </div>
+          <label><span>内容</span><textarea required minLength={2} maxLength={2000} rows={4} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="写下具体问题、补充依据，或说明你在哪一步遇到了困难。" /></label>
+          <label className="feedback-honeypot" aria-hidden="true">网站<input tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} /></label>
+          <div className="comment-form-actions"><small>{authUser?.role === "admin" ? "站主回复会直接公开。" : "提交后先由站主审核，避免广告与无关内容。"}</small><button type="submit" disabled={submitState === "sending"}>{submitState === "sending" ? "正在提交…" : replyTo ? "提交回复" : anchorText ? "提交批注" : "提交留言"}</button></div>
+          {submitText && <p className={`comment-submit-status ${submitState}`}>{submitText}</p>}
+        </form>
+      </div>
+    </section>
+  </>;
+}
+
 function buildCsv(snapshot: FinanceBillSnapshot) {
   const firstPaymentAmount = snapshot.firstPaymentAmount ?? snapshot.downPaymentAmount + snapshot.purchaseTax + snapshot.insuranceFee + snapshot.registrationFee + (snapshot.otherUpfrontFee ?? 0) + snapshot.financeServiceFee;
   const rows = [
     ["分类", "项目", "金额（元）", "说明"],
     ["概要", "称呼", snapshot.customerName, snapshot.billTitle],
-    ["概要", "车型", `${snapshot.currentModelName} / ${snapshot.currentTrimName}`, snapshot.purchaseMode === "baas" ? "BaaS 租电" : "整车购买"],
+    ["概要", "品牌与计价方式", `${snapshot.currentModelName} / ${snapshot.currentTrimName}`, snapshot.purchaseMode === "baas" ? "BaaS 租电" : "整车购买"],
     ["概要", "金融方案", snapshot.financePlan, snapshot.planDescription],
     ["概要", "生成时间", snapshot.generatedAt, snapshot.billNote],
-    ["一次性", "车辆小计", String(Math.round(snapshot.vehicleSubtotal)), "车辆成交价、官方选装、自定义预算"],
+    ["一次性", "车辆小计", String(Math.round(snapshot.vehicleSubtotal)), "用户输入购车金额；蔚来租电时扣除手动填写的减免"],
     ["一次性", "首付现金", String(Math.round(snapshot.downPaymentAmount)), `首付比例 ${snapshot.downPaymentRate}%`],
     ["一次性", "购置税", String(Math.round(snapshot.purchaseTax)), snapshot.purchaseTaxMode === "new-energy" ? "新能源减半口径" : "普通车辆 10% 口径"],
     ["一次性", "首年保险", String(Math.round(snapshot.insuranceFee)), "按实际报价替换"],
@@ -773,7 +879,7 @@ function buildBillDocument(snapshot: FinanceBillSnapshot) {
         <div>
           <p class="eyebrow">Finance bill</p>
           <h1>${escapeHtml(snapshot.billTitle)}</h1>
-          <p class="lead">${escapeHtml(snapshot.customerName)} 的购车金融账单，生成于 ${escapeHtml(snapshot.generatedAt)}。车型：${escapeHtml(snapshot.currentModelName)} / ${escapeHtml(snapshot.currentTrimName)}。${escapeHtml(snapshot.planDescription)} ${escapeHtml(snapshot.billNote)}</p>
+          <p class="lead">${escapeHtml(snapshot.customerName)} 的购车金融账单，生成于 ${escapeHtml(snapshot.generatedAt)}。品牌：${escapeHtml(snapshot.currentModelName)}。${escapeHtml(snapshot.planDescription)} ${escapeHtml(snapshot.billNote)}</p>
         </div>
         <div class="badge">${escapeHtml(snapshot.purchaseMode === "baas" ? "BaaS 租电方案" : "整车购买方案")}</div>
       </div>
@@ -811,10 +917,10 @@ function buildBillDocument(snapshot: FinanceBillSnapshot) {
       <section class="card">
         <h2>口径说明</h2>
         <p class="note">等额本息 = 本金 × 月利率 × (1 + 月利率)^期数 ÷ [(1 + 月利率)^期数 - 1]。等额本金按固定本金递减计息。新能源购置税与 BaaS 月租均按页面输入估算，最终以合同为准。</p>
-        <p class="note">这份文档适合作为个人账单、家庭讨论页或销售沟通页使用。</p>
+        <p class="note">这份文档适合作为个人账单或家庭讨论页使用。计算结果仅供估算，最终以金融机构和合同为准。</p>
       </section>
     </div>
-    <p class="footer">周多福 · 购车金融账单</p>
+    <p class="footer">周多福个人工作室 · 汽车金融与持有成本工具</p>
   </div>
 </body>
 </html>`;
@@ -825,27 +931,27 @@ export default function Home() {
   const [homeView, setHomeView] = useState<HomeViewKey>("about");
   const [selectedRecordCategory, setSelectedRecordCategory] = useState<RecordCategoryKey | "all">("all");
   const [selectedStage, setSelectedStage] = useState<StageKey | "all">("all");
-  const [selectedDailyId, setSelectedDailyId] = useState("2026-07-29-content-collections");
+  const [selectedDailyId, setSelectedDailyId] = useState("2026-08-28-leaving-is-also-a-choice");
+  const [selectedCarRecordId, setSelectedCarRecordId] = useState("2026-07-24-first-car-stage");
   const [selectedColumn, setSelectedColumn] = useState<ColumnKey | "all">("all");
   const [articleQuery, setArticleQuery] = useState("");
-  const [expandedArticle, setExpandedArticle] = useState<string | null>("car-fit");
+  const [expandedArticle, setExpandedArticle] = useState<string | null>("problem-to-proof");
   const [expandedEfficiency, setExpandedEfficiency] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelKey>("l60");
-  const [selectedTrim, setSelectedTrim] = useState("Max");
+  const [selectedTutorialId, setSelectedTutorialId] = useState(tutorials[0]?.id ?? "");
+  const [tutorialCategory, setTutorialCategory] = useState("全部");
+  const [visitCount, setVisitCount] = useState<number | null>(null);
+  const [selectedBrand, setSelectedBrand] = useState<BrandKey>("other");
+  const [batteryReduction, setBatteryReduction] = useState(0);
   const [purchaseMode, setPurchaseMode] = useState<PurchaseMode>("vehicle");
   const [manualVehiclePrice, setManualVehiclePrice] = useState(202800);
-  const [financePlan, setFinancePlan] = useState<FinancePlanKey>("nio-five-year");
   const [financeMode, setFinanceMode] = useState<FinanceMode>("equal-payment");
   const [purchaseTaxMode, setPurchaseTaxMode] = useState<PurchaseTaxMode>("new-energy");
   const [downPaymentRate, setDownPaymentRate] = useState(20);
   const [financeYears, setFinanceYears] = useState(5);
   const [annualRate, setAnnualRate] = useState(3.5);
-  const [fiveYearPayoffMonth, setFiveYearPayoffMonth] = useState(36);
   const [loanPayoffMonth, setLoanPayoffMonth] = useState(60);
   const [ownershipYears, setOwnershipYears] = useState(5);
   const [vatRate, setVatRate] = useState(13);
-  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
-  const [customBudget, setCustomBudget] = useState(0);
   const [insuranceFee, setInsuranceFee] = useState(5500);
   const [registrationFee, setRegistrationFee] = useState(800);
   const [otherUpfrontFee, setOtherUpfrontFee] = useState(0);
@@ -854,13 +960,32 @@ export default function Home() {
   const [chargingMonthly, setChargingMonthly] = useState(300);
   const [parkingMonthly, setParkingMonthly] = useState(0);
   const [maintenanceMonthly, setMaintenanceMonthly] = useState(0);
-  const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>("commute");
   const [financeTab, setFinanceTab] = useState<"summary" | "details">("summary");
   const [customerName, setCustomerName] = useState("周先生");
-  const [billTitle, setBillTitle] = useState("乐道购车金融账单");
-  const [billNote, setBillNote] = useState("用于家庭讨论、试驾沟通和长期预算确认。");
+  const [billTitle, setBillTitle] = useState("购车金融与持有成本账单");
+  const [billNote, setBillNote] = useState("用于个人留档、家庭讨论和长期预算确认。");
   const [savedBills, setSavedBills] = useState<SavedFinanceBill[]>([]);
   const [savedBillsLoaded, setSavedBillsLoaded] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<FeedbackType>("suggestion");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackContact, setFeedbackContact] = useState("");
+  const [feedbackWebsite, setFeedbackWebsite] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [feedbackStatusText, setFeedbackStatusText] = useState("");
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authConsent, setAuthConsent] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authStatusText, setAuthStatusText] = useState("");
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [billSaveStatus, setBillSaveStatus] = useState("");
+  const [adminFeedbackItems, setAdminFeedbackItems] = useState<AdminFeedbackItem[]>([]);
+  const [adminBillItems, setAdminBillItems] = useState<AdminBillItem[]>([]);
+  const [adminCommentItems, setAdminCommentItems] = useState<AdminCommentItem[]>([]);
+  const [adminReplyDrafts, setAdminReplyDrafts] = useState<Record<string, string>>({});
+  const [adminInboxOpen, setAdminInboxOpen] = useState(false);
 
   const filteredArticles = useMemo(() => {
     const query = articleQuery.trim().toLowerCase();
@@ -873,54 +998,37 @@ export default function Home() {
 
   const filteredDailyRecords = useMemo(() => {
     return dailyRecords.filter((record) => {
+      if (record.category === "car-info") return false;
       const matchesCategory = selectedRecordCategory === "all" || record.category === selectedRecordCategory;
-      const matchesStage = selectedStage === "all" || record.stage === selectedStage;
-      return matchesCategory && matchesStage;
+      return matchesCategory;
     });
-  }, [selectedRecordCategory, selectedStage]);
+  }, [selectedRecordCategory]);
 
   const selectedDailyRecord = filteredDailyRecords.find((record) => record.id === selectedDailyId) ?? filteredDailyRecords[0] ?? dailyRecords[0];
   const activeCollection = selectedRecordCategory === "all" ? null : recordCollections.find((collection) => collection.key === selectedRecordCategory);
   const activePurchaseStage = selectedStage === "all" ? null : purchaseStages.find((stage) => stage.key === selectedStage);
+  const carRecords = dailyRecords.filter((record) => record.category === "car-info" && (selectedStage === "all" || record.stage === selectedStage));
+  const selectedCarRecord = carRecords.find((record) => record.id === selectedCarRecordId) ?? carRecords[0] ?? dailyRecords.find((record) => record.category === "car-info")!;
+  const tutorialCategories = ["全部", ...Array.from(new Set(tutorials.map((tutorial) => tutorial.category)))];
+  const visibleTutorials = tutorials.filter((tutorial) => tutorialCategory === "全部" || tutorial.category === tutorialCategory);
+  const selectedTutorial = visibleTutorials.find((tutorial) => tutorial.id === selectedTutorialId) ?? visibleTutorials[0] ?? tutorials[0];
 
-  const currentModel = models[selectedModel];
-  const currentTrim = currentModel.trims.find((trim) => trim.name === selectedTrim) ?? currentModel.trims[0];
-  const visibleOptions = knownOptions.filter((option) => option.models.includes(selectedModel));
-  const optionTotal = useMemo(() => visibleOptions.reduce((total, option) => option.excludedTrim === currentTrim.name || !selectedOptions.includes(option.id) ? total : total + option.price, 0), [currentTrim.name, selectedOptions, visibleOptions]);
+  const currentBrandLabel = brandOptions.find((brand) => brand.key === selectedBrand)?.label ?? "其他品牌";
+  const currentBrandReference = brandReferences.find((brand) => brand.key === selectedBrand);
+  const nioBaasEnabled = nioGroupBrands.includes(selectedBrand) && purchaseMode === "baas";
   const basePrice = manualVehiclePrice;
-  const scenario = scenarios[selectedScenario];
-  const vehicleSubtotal = basePrice + optionTotal + customBudget;
+  const vehicleSubtotal = Math.max(0, basePrice - (nioBaasEnabled ? batteryReduction : 0));
   const purchaseTax = calculatePurchaseTax(vehicleSubtotal, purchaseTaxMode, vatRate);
   const downPaymentAmount = (vehicleSubtotal * downPaymentRate) / 100;
   const loanPrincipal = Math.max(0, vehicleSubtotal - downPaymentAmount);
   const customLoanTermMonths = Math.max(1, Math.round(financeYears * 12));
-  const loanTermMonths = financePlan === "nio-five-year" ? 60 : financePlan === "nio-seven-year" ? 84 : customLoanTermMonths;
+  const loanTermMonths = customLoanTermMonths;
   const ownershipMonths = Math.max(1, Math.round(ownershipYears * 12));
-  const customLoanQuote = calculateLoanQuote(loanPrincipal, annualRate, customLoanTermMonths, financeMode);
-  const officialFiveYearQuote = calculateNioFiveYearQuote(loanPrincipal);
-  const officialSevenYearQuote = calculateFlatFeeLoan(loanPrincipal, 84, 0.99, 7);
-  const loanQuote =
-    financePlan === "nio-five-year"
-      ? officialFiveYearQuote
-      : financePlan === "nio-seven-year"
-        ? officialSevenYearQuote
-        : customLoanQuote;
-  const displayedRateLabel =
-    financePlan === "nio-five-year"
-      ? "3% 费率 / 5.64% 参考年化"
-      : financePlan === "nio-seven-year"
-        ? "0.99%"
-        : formatPercent(annualRate);
-  const selectedFinancePlan = financePresets.find((preset) => preset.key === financePlan) ?? financePresets[0];
-  const earlyPayoffEligibleMonth = financePlan === "nio-five-year" ? 36 : financePlan === "nio-seven-year" ? 3 : 0;
-  const earlyPayoffAmount =
-    earlyPayoffEligibleMonth > 0
-      ? loanQuote.remainingPrincipalByMonth[Math.min(earlyPayoffEligibleMonth, loanQuote.remainingPrincipalByMonth.length - 1)] ?? 0
-      : 0;
-  const settlementMonth =
-    financePlan === "nio-five-year"
-      ? Math.min(loanTermMonths, Math.max(36, Math.round(fiveYearPayoffMonth)))
-      : Math.min(loanTermMonths, Math.max(1, Math.round(loanPayoffMonth)));
+  const loanQuote = calculateLoanQuote(loanPrincipal, annualRate, customLoanTermMonths, financeMode);
+  const displayedRateLabel = formatPercent(annualRate);
+  const earlyPayoffEligibleMonth = 0;
+  const earlyPayoffAmount = 0;
+  const settlementMonth = Math.min(loanTermMonths, Math.max(1, Math.round(loanPayoffMonth)));
   const settlementAmount = settlementMonth < loanTermMonths
     ? loanQuote.remainingPrincipalByMonth[settlementMonth] ?? 0
     : 0;
@@ -937,16 +1045,11 @@ export default function Home() {
   const monthlyLoanPayment = loanQuote.monthlyPayments[0] ?? 0;
   const loanPaymentsThroughSettlement = loanQuote.monthlyPayments.slice(0, settlementMonth).reduce((sum, payment) => sum + payment, 0);
   const interestPaidThroughSettlement = Math.max(0, loanPaymentsThroughSettlement + settlementAmount - loanPrincipal);
-  const planDescription =
-    financePlan === "nio-five-year"
-      ? `5 年 60 期：前 36 期 0 费，后 24 期按原贷款金额 × 3% × 2 年计费；按第 ${settlementMonth} 期结清，总利息约 ${formatPrice(interestPaidThroughSettlement)}，结清金额约 ${formatPrice(settlementAmount)}。`
-      : financePlan === "nio-seven-year"
-        ? "7 年 84 期：按年化费率 0.99% 估算；满 3 期后可申请一次性结清。"
-        : `自定义 ${financeYears || 0} 年 ${customLoanTermMonths} 期，按你输入的年化利率和还款方式估算。`;
-  const batteryMonths = purchaseMode === "baas" ? ownershipMonths : 0;
+  const planDescription = `自定义 ${financeYears || 0} 年 ${customLoanTermMonths} 期，按你输入的年化利率、还款方式和第 ${settlementMonth} 期结清估算。`;
+  const batteryMonths = nioBaasEnabled ? ownershipMonths : 0;
   const batteryRentTotal = batteryRentMonthly * batteryMonths;
   const monthlyRunningCost = chargingMonthly + parkingMonthly + maintenanceMonthly;
-  const monthlyOwnershipCost = (purchaseMode === "baas" ? batteryRentMonthly : 0) + monthlyRunningCost;
+  const monthlyOwnershipCost = (nioBaasEnabled ? batteryRentMonthly : 0) + monthlyRunningCost;
   const firstPaymentAmount = downPaymentAmount + purchaseTax + insuranceFee + registrationFee + otherUpfrontFee + financeServiceFee;
   const vehicleCost = vehicleSubtotal + purchaseTax + insuranceFee + registrationFee + otherUpfrontFee;
   const financingCost = interestPaidThroughSettlement + financeServiceFee;
@@ -969,31 +1072,28 @@ export default function Home() {
     { label: "金融服务费", amount: financeServiceFee, note: "如方案没有该项，可保持为 0" },
   ];
   const ownershipMonthlyFeeItems = [
-    { label: "BaaS 电池月租", amount: purchaseMode === "baas" ? batteryRentMonthly : 0, note: "仅选择租电方案时计入，按你的合同月租填写" },
+    { label: "BaaS 电池月租", amount: nioBaasEnabled ? batteryRentMonthly : 0, note: "仅蔚来公司三个品牌选择租电方案时计入，按合同月租填写" },
     { label: "充电 / 换电", amount: chargingMonthly, note: "按个人通勤里程和补能习惯估算" },
     { label: "停车", amount: parkingMonthly, note: "车位、临停或单位停车费用" },
     { label: "保养及杂费", amount: maintenanceMonthly, note: "洗车、耗材、轮胎、保养等长期支出" },
   ];
   const monthlyFeeItems = [
-    { label: "金融月供", amount: monthlyLoanPayment, note: financePlan === "nio-five-year" ? "前 36 期免息月供，后 24 期会变化" : financePlan === "nio-seven-year" ? "7 年超低息方案估算月供" : financeMode === "equal-principal" ? "等额本金首月最高，后续递减" : financeMode === "interest-free" ? "免息分期，本金平均摊还" : "等额本息，每月基本一致" },
-    { label: "后段月供", amount: loanQuote.lastPayment, note: financePlan === "nio-five-year" ? "第 37-60 期参考月供" : "当前方案末期月供参考" },
-    { label: "结清金额参考", amount: settlementAmount, note: settlementAmount > 0 ? `按第 ${settlementMonth} 期一次结清估算` : earlyPayoffEligibleMonth > 0 ? `满 ${earlyPayoffEligibleMonth} 期可申请，具体以金融机构确认为准` : "当前按完整分期还完" },
+    { label: "金融月供", amount: monthlyLoanPayment, note: financeMode === "equal-principal" ? "等额本金首月最高，后续递减" : financeMode === "interest-free" ? "免息分期，本金平均摊还" : "等额本息，每月基本一致" },
+    { label: "末期月供", amount: loanQuote.lastPayment, note: "当前输入方案的末期月供参考" },
+    { label: "结清金额参考", amount: settlementAmount, note: settlementAmount > 0 ? `按第 ${settlementMonth} 期一次结清估算` : "当前按完整分期还完" },
     ...ownershipMonthlyFeeItems,
   ];
   const currentBillSnapshot: FinanceBillSnapshot = {
-    selectedModel,
-    selectedTrim,
+    selectedBrand,
+    batteryReduction,
     purchaseMode,
-    financePlan,
+    financePlan: "custom",
     financeMode,
     purchaseTaxMode,
     manualVehiclePrice,
-    selectedOptions,
-    customBudget,
     downPaymentRate,
     financeYears,
     annualRate,
-    fiveYearPayoffMonth,
     loanPayoffMonth,
     ownershipYears,
     vatRate,
@@ -1009,8 +1109,8 @@ export default function Home() {
     billTitle,
     billNote,
     generatedAt: new Intl.DateTimeFormat("zh-CN", { dateStyle: "full", timeStyle: "short" }).format(new Date()),
-    currentModelName: currentModel.name,
-    currentTrimName: currentTrim.name,
+    currentModelName: currentBrandLabel,
+    currentTrimName: "自定义购车金额",
     vehicleSubtotal,
     purchaseTax,
     downPaymentAmount,
@@ -1062,51 +1162,79 @@ export default function Home() {
     }
   }, [savedBills, savedBillsLoaded]);
 
-  function chooseModel(modelKey: ModelKey) {
-    setSelectedModel(modelKey);
-    setSelectedTrim(models[modelKey].trims[1]?.name ?? models[modelKey].trims[0].name);
-    setSelectedOptions([]);
-    setCustomBudget(0);
-    setManualVehiclePrice(purchaseMode === "vehicle" ? models[modelKey].trims[1]?.vehiclePrice ?? models[modelKey].trims[0].vehiclePrice : models[modelKey].trims[1]?.baasPrice ?? models[modelKey].trims[0].baasPrice);
-  }
+  useEffect(() => {
+    let cancelled = false;
+    async function restoreAccount() {
+      try {
+        const response = await fetch("/api/auth/me");
+        const payload = (await response.json()) as { user?: AuthUser | null };
+        if (cancelled || !payload.user) return;
+        setAuthUser(payload.user);
+        const billResponse = await fetch("/api/bills");
+        const billPayload = (await billResponse.json()) as { bills?: SavedFinanceBill[] };
+        if (!cancelled && billResponse.ok && billPayload.bills) setSavedBills(billPayload.bills);
+      } catch {
+        // The public calculator remains usable when D1 is not connected yet.
+      }
+    }
+    void restoreAccount();
+    return () => { cancelled = true; };
+  }, []);
 
-  function chooseTrim(trimName: string) {
-    const trim = currentModel.trims.find((item) => item.name === trimName) ?? currentModel.trims[0];
-    setSelectedTrim(trim.name);
-    setSelectedOptions([]);
-    setManualVehiclePrice(purchaseMode === "vehicle" ? trim.vehiclePrice : trim.baasPrice);
+  useEffect(() => {
+    let cancelled = false;
+    async function countVisit() {
+      try {
+        const method = window.sessionStorage.getItem("zhouduofu-visit-counted") ? "GET" : "POST";
+        const response = await fetch("/api/stats/visits", { method });
+        const payload = (await response.json()) as { count?: number };
+        if (!cancelled && response.ok && typeof payload.count === "number") {
+          setVisitCount(payload.count);
+          window.sessionStorage.setItem("zhouduofu-visit-counted", "1");
+        }
+      } catch {
+        // The site remains usable when the visit counter is temporarily unavailable.
+      }
+    }
+    void countVisit();
+    return () => { cancelled = true; };
+  }, []);
+
+  function chooseBrand(brand: BrandKey) {
+    setSelectedBrand(brand);
+    if (!nioGroupBrands.includes(brand)) {
+      setPurchaseMode("vehicle");
+      setBatteryReduction(0);
+      setBatteryRentMonthly(0);
+    }
   }
 
   function switchPurchaseMode(mode: PurchaseMode) {
     setPurchaseMode(mode);
-    setManualVehiclePrice(mode === "vehicle" ? currentTrim.vehiclePrice : currentTrim.baasPrice);
-  }
-
-  function toggleOption(option: KnownOption) {
-    if (option.excludedTrim === currentTrim.name) return;
-    setSelectedOptions((current) => current.includes(option.id) ? current.filter((id) => id !== option.id) : [...current, option.id]);
-  }
-
-  function applyFinancePreset(preset: typeof financePresets[number]) {
-    setFinancePlan(preset.key);
-    if (preset.key === "nio-five-year") setFiveYearPayoffMonth(36);
-    if (preset.downPaymentRate !== undefined) setDownPaymentRate(preset.downPaymentRate);
-    if (preset.termYears !== undefined) {
-      setFinanceYears(preset.termYears);
-      setLoanPayoffMonth(preset.termYears * 12);
+    if (mode === "vehicle") {
+      setBatteryReduction(0);
+      setBatteryRentMonthly(0);
     }
-    if (preset.mode) setFinanceMode(preset.mode);
-    if (preset.annualRate !== undefined) setAnnualRate(preset.annualRate);
   }
 
-  function switchToCustomPlan() {
-    setFinancePlan("custom");
-  }
-
-  function saveCurrentBill() {
+  async function saveCurrentBill() {
     const savedAt = new Date().toISOString();
-    const id = `${selectedModel}-${Date.now()}`;
+    const id = `${selectedBrand}-${savedAt}`;
     const snapshot = { ...currentBillSnapshot, generatedAt: new Intl.DateTimeFormat("zh-CN", { dateStyle: "full", timeStyle: "short" }).format(new Date()) };
+    if (authUser) {
+      setBillSaveStatus("正在保存到云端…");
+      try {
+        const response = await fetch("/api/bills", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ snapshot }) });
+        const payload = (await response.json()) as SavedFinanceBill & { error?: string };
+        if (!response.ok) throw new Error(payload.error || "保存失败");
+        setSavedBills((current) => [payload, ...current.filter((item) => item.id !== payload.id)].slice(0, 30));
+        setBillSaveStatus("已保存到云端，可在其他设备登录后继续查看。");
+        return;
+      } catch (error) {
+        setBillSaveStatus(error instanceof Error ? error.message : "云端保存暂时失败。");
+        return;
+      }
+    }
     setSavedBills((current) => [
       {
         id,
@@ -1115,23 +1243,21 @@ export default function Home() {
       },
       ...current.slice(0, 11),
     ]);
+    setBillSaveStatus("已保存在当前浏览器。登录后可以跨设备保存。");
   }
 
   function loadSavedBill(item: SavedFinanceBill) {
     const form = item.snapshot;
-    setSelectedModel(form.selectedModel);
-    setSelectedTrim(form.selectedTrim);
-    setPurchaseMode(form.purchaseMode);
-    setFinancePlan(form.financePlan);
+    const restoredBrand = form.selectedBrand ?? (form.currentModelName?.includes("乐道") ? "onvo" : "other");
+    setSelectedBrand(restoredBrand);
+    setBatteryReduction(form.batteryReduction ?? 0);
+    setPurchaseMode(nioGroupBrands.includes(restoredBrand) ? form.purchaseMode : "vehicle");
     setFinanceMode(form.financeMode);
     setPurchaseTaxMode(form.purchaseTaxMode);
     setManualVehiclePrice(form.manualVehiclePrice);
-    setSelectedOptions(form.selectedOptions);
-    setCustomBudget(form.customBudget);
     setDownPaymentRate(form.downPaymentRate);
     setFinanceYears(form.financeYears);
     setAnnualRate(form.annualRate);
-    setFiveYearPayoffMonth(form.fiveYearPayoffMonth ?? 36);
     setLoanPayoffMonth(form.loanPayoffMonth ?? Math.max(1, Math.min(form.financeYears * 12, form.ownershipYears * 12)));
     setOwnershipYears(form.ownershipYears);
     setVatRate(form.vatRate);
@@ -1161,22 +1287,27 @@ export default function Home() {
     exportBillSnapshot(currentBillSnapshot, kind);
   }
 
-  function deleteSavedBill(id: string) {
+  async function deleteSavedBill(id: string) {
+    if (authUser) {
+      const response = await fetch("/api/bills", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
+      if (!response.ok) {
+        setBillSaveStatus("云端账单暂时无法删除，请稍后再试。");
+        return;
+      }
+    }
     setSavedBills((current) => current.filter((item) => item.id !== id));
   }
 
   function chooseRecordCategory(category: RecordCategoryKey | "all") {
     setSelectedRecordCategory(category);
-    setSelectedStage("all");
-    const nextRecord = dailyRecords.find((record) => category === "all" || record.category === category);
+    const nextRecord = dailyRecords.find((record) => record.category !== "car-info" && (category === "all" || record.category === category));
     if (nextRecord) setSelectedDailyId(nextRecord.id);
   }
 
   function chooseStage(stage: StageKey | "all") {
     setSelectedStage(stage);
-    setSelectedRecordCategory("car-info");
     const nextRecord = dailyRecords.find((record) => stage === "all" ? record.category === "car-info" : record.stage === stage);
-    if (nextRecord) setSelectedDailyId(nextRecord.id);
+    if (nextRecord) setSelectedCarRecordId(nextRecord.id);
   }
 
   function selectWorkspace(workspace: WorkspaceKey) {
@@ -1193,12 +1324,129 @@ export default function Home() {
     });
   }
 
+  async function loadRemoteBills() {
+    const response = await fetch("/api/bills");
+    const payload = (await response.json()) as { bills?: SavedFinanceBill[]; error?: string };
+    if (!response.ok) throw new Error(payload.error || "账单暂时无法读取。");
+    setSavedBills(payload.bills ?? []);
+  }
+
+  async function submitAuth(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (authMode === "register" && !authConsent) {
+      setAuthStatusText("请先阅读并同意服务提示后再注册。");
+      return;
+    }
+    setAuthSubmitting(true);
+    setAuthStatusText("");
+    try {
+      const response = await fetch(`/api/auth/${authMode}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: authEmail, password: authPassword }) });
+      const payload = (await response.json()) as { user?: AuthUser; error?: string };
+      if (!response.ok || !payload.user) throw new Error(payload.error || "操作失败");
+      setAuthUser(payload.user);
+      setAuthPassword("");
+      setAuthOpen(false);
+      await loadRemoteBills();
+      setBillSaveStatus("登录成功；之后保存的账单会同步到云端。");
+    } catch (error) {
+      setAuthStatusText(error instanceof Error ? error.message : "登录暂时失败，请稍后再试。");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  async function logoutUser() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setAuthUser(null);
+    setAuthOpen(false);
+    setSavedBills([]);
+    setBillSaveStatus("已退出登录；当前浏览器仍可继续使用计算器。");
+  }
+
+  async function loadAdminInbox() {
+    try {
+      const [feedbackResponse, billsResponse, commentsResponse] = await Promise.all([fetch("/api/admin/feedback"), fetch("/api/admin/bills"), fetch("/api/admin/comments")]);
+      const feedbackPayload = (await feedbackResponse.json()) as { feedback?: AdminFeedbackItem[]; error?: string };
+      const billsPayload = (await billsResponse.json()) as { bills?: AdminBillItem[]; error?: string };
+      const commentsPayload = (await commentsResponse.json()) as { comments?: AdminCommentItem[]; error?: string };
+      if (!feedbackResponse.ok) throw new Error(feedbackPayload.error || "留言暂时无法读取。");
+      if (!billsResponse.ok) throw new Error(billsPayload.error || "账单暂时无法读取。");
+      if (!commentsResponse.ok) throw new Error(commentsPayload.error || "文章讨论暂时无法读取。");
+      setAdminFeedbackItems(feedbackPayload.feedback ?? []);
+      setAdminBillItems(billsPayload.bills ?? []);
+      setAdminCommentItems(commentsPayload.comments ?? []);
+      setAdminInboxOpen(true);
+    } catch (error) {
+      setFeedbackStatus("error");
+      setFeedbackStatusText(error instanceof Error ? error.message : "管理员收件箱暂时无法读取。");
+    }
+  }
+
+  async function updateAdminCommentStatus(id: string, status: "published" | "hidden") {
+    const response = await fetch("/api/admin/comments", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, status }) });
+    const payload = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setFeedbackStatus("error");
+      setFeedbackStatusText(payload.error || "文章留言状态暂时无法更新。");
+      return;
+    }
+    await loadAdminInbox();
+    window.dispatchEvent(new CustomEvent("content-comment-updated"));
+  }
+
+  async function replyToAdminComment(item: AdminCommentItem) {
+    const message = adminReplyDrafts[item.id]?.trim() ?? "";
+    if (message.length < 2) {
+      setFeedbackStatus("error");
+      setFeedbackStatusText("请先写下至少两个字的回复。");
+      return;
+    }
+    const response = await fetch("/api/comments", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ contentType: item.contentType, contentId: item.contentId, contentTitle: item.contentTitle, category: "reply", message, parentId: item.parentId || item.id }),
+    });
+    const payload = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setFeedbackStatus("error");
+      setFeedbackStatusText(payload.error || "回复暂时没有提交成功。");
+      return;
+    }
+    setAdminReplyDrafts((current) => ({ ...current, [item.id]: "" }));
+    setFeedbackStatus("success");
+    setFeedbackStatusText("回复已公开，并保留了原留言的引用关系。");
+    await loadAdminInbox();
+    window.dispatchEvent(new CustomEvent("content-comment-updated"));
+  }
+
+  async function submitFeedback(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFeedbackStatus("sending");
+    setFeedbackStatusText("");
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: feedbackType, message: feedbackMessage, contact: feedbackContact, website: feedbackWebsite, page: activeWorkspace }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "提交失败");
+      setFeedbackMessage("");
+      setFeedbackContact("");
+      setFeedbackStatus("success");
+      setFeedbackStatusText("已收到，谢谢你把具体想法告诉我。后续更新我会优先参考这些建议。");
+    } catch (error) {
+      setFeedbackStatus("error");
+      setFeedbackStatusText(error instanceof Error ? error.message : "留言暂时没有提交成功，请稍后再试。");
+    }
+  }
+
   return (
     <main>
       <header className="site-header" aria-label="主导航">
         <button className="brand brand-button" type="button" onClick={() => selectWorkspace("home")} aria-label="周多福首页">
           <span className="brand-mark">周</span>
-          <span><strong>周多福</strong><small>乐道购车顾问 · 经验工作室</small></span>
+          <span><strong>周多福</strong><small>个人工作室 · 持续生长</small></span>
         </button>
         <nav className="workspace-nav" aria-label="内容工作区">
           {workspaceTabs.map((tab) => (
@@ -1207,39 +1455,46 @@ export default function Home() {
             </button>
           ))}
           <button type="button" onClick={goToContact}>联系</button>
+          <button type="button" className="account-nav-button" onClick={() => setAuthOpen(true)}>{authUser ? "我的账户" : "登录"}</button>
         </nav>
       </header>
 
       <section className="hero" id="top">
         <div className="hero-copy">
-          <p className="eyebrow">A practical personal studio</p>
-          <h1>把买车、效率和生活经验，整理成真正能用的东西。</h1>
-          <p className="hero-text">我是周多福。这里不是一张名片，也不是把信息堆在一起的网页，而是一间会持续更新的工作室：你可以读专栏、看效率经验、算乐道预算，也可以带着自己的生活问题来找答案。</p>
-          <div className="hero-actions"><button className="primary-action" type="button" onClick={() => selectWorkspace("life")}>先看四个专栏</button><button className="secondary-action" type="button" onClick={() => selectWorkspace("finance")}>直接算购车预算</button></div>
-          <div className="hero-proof"><span>更新方向</span><strong>真诚、实用、可复用</strong><small>从生活场景出发，慢慢把答案做得更好。</small></div>
+          <p className="eyebrow">Tutorials · Tools · Open notes</p>
+          <h1>把复杂问题，整理成可以直接使用的教程与工具。</h1>
+          <p className="hero-text">这是周多福的个人知识与工具网站。这里提供可照着完成的生活效率教程、保留来源的内容整理方法、开放计算工具，以及对真实经历的长期记录。</p>
+          <div className="hero-actions"><button className="primary-action" type="button" onClick={() => selectWorkspace("life")}>浏览实用教程</button><button className="secondary-action" type="button" onClick={() => selectWorkspace("car")}>使用计算工具</button></div>
+          <div className="hero-proof"><span>网站用途</span><strong>解决问题，而不是堆积信息</strong><small>每篇内容尽量给出步骤、来源和可以复用的结果。</small></div>
         </div>
-        <div className="hero-panel"><img src="/images/home-hero.png" alt="家庭出行准备场景" /><div className="signal-card"><span>我的判断标准</span><strong>不急着成交，先把问题问对。</strong></div></div>
+        <div className="hero-panel studio-orbit" aria-label="个人工作室的三个方向">
+          <div className="orbit-core"><span>ZHOU</span><strong>知识工作室</strong><small>持续整理，持续更新</small></div>
+          <div className="orbit-note orbit-note-one"><span>01</span><strong>实用教程</strong></div>
+          <div className="orbit-note orbit-note-two"><span>02</span><strong>来源与判断</strong></div>
+          <div className="orbit-note orbit-note-three"><span>03</span><strong>开放工具</strong></div>
+          <div className="signal-card"><span>内容标准</span><strong>看得懂，也能照着做。</strong></div>
+        </div>
       </section>
 
-      <section className="intro-band"><p>这里的每一块内容都有一个去处：先认识我，再读专栏；想提高效率，就看方法；准备买车，就进入场景和计算器。</p></section>
+      <section className="intro-band"><p>教程给步骤，工具给结果，记录保留思考过程。</p></section>
       <div className="workspace-anchor" id="workspace-content" aria-hidden="true" />
 
       {activeWorkspace === "records" && <section className="section daily-record-section" id="daily-record">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Daily record</p>
-            <h2>今天的记录，先写成可以反复引用的一段话。</h2>
+            <p className="eyebrow">Open notes</p>
+            <h2>把值得留下的想法，写成可以反复引用的判断。</h2>
           </div>
-          <p className="section-lead">日期、标签、观点和购车阶段，一次整理清楚，后面就能持续积累。</p>
+          <p className="section-lead">不要求日更，也不为了凑数；有真实经历、有新判断时再写下来。</p>
         </div>
 
-        <div className="record-collections" aria-label="每日记录集合分类">
+        <div className="record-collections" aria-label="随心记录集合分类">
           <button type="button" className={selectedRecordCategory === "all" ? "collection-card active" : "collection-card"} onClick={() => chooseRecordCategory("all")}>
             <span>全部记录</span>
             <strong>按日期回看所有沉淀</strong>
             <p>保留完整时间线，方便快速找到最近写过的内容。</p>
           </button>
-          {recordCollections.map((collection) => (
+          {recordCollections.filter((collection) => collection.key !== "car-info").map((collection) => (
             <button type="button" className={selectedRecordCategory === collection.key ? "collection-card active" : "collection-card"} key={collection.key} onClick={() => chooseRecordCategory(collection.key)}>
               <span>{collection.label}</span>
               <strong>{collection.title}</strong>
@@ -1249,7 +1504,7 @@ export default function Home() {
         </div>
 
         <div className="daily-layout">
-          <aside className="record-browser" aria-label="按日期选择每日记录">
+          <aside className="record-browser" aria-label="按日期选择随心记录">
             <div className="browser-head">
               <p className="eyebrow">Records</p>
               <h3>按日期阅读</h3>
@@ -1270,7 +1525,7 @@ export default function Home() {
             <div className="daily-meta">
               <span>{selectedDailyRecord.date}</span>
               <span>{recordCollections.find((collection) => collection.key === selectedDailyRecord.category)?.label}</span>
-              {selectedDailyRecord.stage && <span>{purchaseStages.find((stage) => stage.key === selectedDailyRecord.stage)?.title}</span>}
+              {selectedDailyRecord.updatedAt && <span>更新于 {selectedDailyRecord.updatedAt}</span>}
             </div>
             <h3>{selectedDailyRecord.title}</h3>
             <div className="record-tags">
@@ -1278,59 +1533,25 @@ export default function Home() {
                 <button type="button" key={tag} onClick={() => setSelectedDailyId(selectedDailyRecord.id)}>{tag}</button>
               ))}
             </div>
-            {selectedDailyRecord.paragraphs.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
-            <div className="daily-takeaway">
-              <span>记录结论</span>
-              <strong>{selectedDailyRecord.takeaway}</strong>
-            </div>
+            <ContentDiscussion key={selectedDailyRecord.id} contentType="record" contentId={selectedDailyRecord.id} contentTitle={selectedDailyRecord.title} authUser={authUser}>
+              {selectedDailyRecord.content
+                ? <TutorialBody content={selectedDailyRecord.content} />
+                : selectedDailyRecord.paragraphs.map((paragraph, paragraphIndex) => <p data-comment-block={`paragraph-${paragraphIndex}`} key={paragraph}>{paragraph}</p>)}
+              {selectedDailyRecord.sources && (
+                <div className="record-sources" data-comment-block="sources" aria-label="资料来源">
+                  <span>资料来源与核验</span>
+                  {selectedDailyRecord.sources.map((source) => <a key={source.href} href={source.href} target="_blank" rel="noreferrer">{source.label} ↗</a>)}
+                </div>
+              )}
+              <div className="daily-takeaway" data-comment-block="takeaway">
+                <span>记录结论</span>
+                <strong>{selectedDailyRecord.takeaway}</strong>
+              </div>
+            </ContentDiscussion>
           </article>
 
         </div>
 
-        <div className="journey-dashboard">
-          <section className="timeline-card" id="journey">
-              <div className="timeline-head">
-                <div>
-                  <p className="eyebrow">Buyer journey</p>
-                  <h3>买车阶段时间线</h3>
-                </div>
-                <button type="button" className={selectedStage === "all" ? "filter-chip active" : "filter-chip"} onClick={() => chooseStage("all")}>全部阶段</button>
-              </div>
-              <div className="journey-scroll" tabIndex={0} aria-label="横向浏览买车阶段">
-                <ol className="journey-list">
-                  {purchaseStages.map((item) => (
-                    <li key={item.step} className={selectedStage === item.key ? "active" : ""}>
-                      <button type="button" aria-pressed={selectedStage === item.key} onClick={() => chooseStage(item.key)} aria-label={`查看${item.title}阶段的记录`}>
-                        <span>{item.step}</span>
-                        <strong>{item.title}</strong>
-                      </button>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-              <div className="journey-active-note" aria-live="polite">
-                <span>{activePurchaseStage ? `阶段 ${activePurchaseStage.step}` : "全部阶段"}</span>
-                <strong>{activePurchaseStage?.title ?? "完整买车路径"}</strong>
-                <p>{activePurchaseStage?.note ?? "点击任一阶段，会同步筛选上方的相关记录；再次查看全部阶段可回到完整时间线。"}</p>
-              </div>
-          </section>
-
-          <section className="delivery-card compact-delivery-card">
-              <p className="eyebrow">Delivery service</p>
-              <h3>交付后的用车生命周期服务</h3>
-              <p>
-                对蔚来这类用户企业来说，交付不是结束，而是长期服务和生态体验的开始。
-                重点不只是把车交出去，而是让后面的用车问题、补能、售后和社区体验都能持续被接住。
-              </p>
-              <ul>
-                {deliveryServices.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-          </section>
-        </div>
         {activeCollection && <p className="collection-note">当前集合：{activeCollection.label}。{activeCollection.intro}</p>}
       </section>}
 
@@ -1348,7 +1569,15 @@ export default function Home() {
                 <div className="profile-mark">周</div>
                 <div><p className="eyebrow">About the person behind the page</p><h2>{profile.name}</h2><p className="profile-role">{profile.role}</p><p>{profile.intro}</p><a className="text-link" href="mailto:otafukuchau@gmail.com">发邮件聊聊 →</a></div>
               </div>
-              <div className="profile-notes"><p className="eyebrow">服务原则</p><h3>每一次沟通，都先把信息和选择边界讲清楚。</h3><ul>{profile.promise.map((item) => <li key={item}>{item}</li>)}</ul><p className="muted-note">服务范围：乐道车型选购、方案对比、试驾沟通与长期用车预算。</p></div>
+              <div className="profile-notes"><p className="eyebrow">工作室原则</p><h3>把经验变成能复用的内容，把判断留给每一位使用者。</h3><ul>{profile.promise.map((item) => <li key={item}>{item}</li>)}</ul><p className="muted-note">长期方向：实用教程、随心记录、开放工具与生活选择。</p></div>
+            </section>
+            <section className="career-path" aria-labelledby="career-path-heading">
+              <div><p className="eyebrow">Personal path</p><h2 id="career-path-heading">经历不是标签，而是下一阶段的材料。</h2></div>
+              <ol>
+                <li><span>01</span><div><strong>汽车一线销售</strong><p>在真实用户、价格与服务之间，积累沟通、金融计算和决策支持经验。</p></div></li>
+                <li><span>02</span><div><strong>重新选择边界</strong><p>离开长期不可持续的工作节奏，重新审视健康、权益与个人发展的关系。</p></div></li>
+                <li><span>03</span><div><strong>个人知识工作室</strong><p>把经历整理为教程、工具和有来源的记录，让解决问题的能力持续积累。</p></div></li>
+              </ol>
             </section>
           </div>
         )}
@@ -1363,10 +1592,34 @@ export default function Home() {
       </>}
 
       {activeWorkspace === "life" && <>
+      <section className="section tutorial-section" id="tutorials">
+        <div className="section-heading">
+          <div><p className="eyebrow">Practical tutorials</p><h2>教程不是告诉你“应该”，而是陪你把问题做完。</h2></div>
+          <p className="section-lead">从网络与隐私、内容搜集到来源表格，每篇都保留步骤、适用边界和可核对来源。新内容可通过本地发布工具直接维护。</p>
+        </div>
+        <div className="tutorial-filters" aria-label="教程分类">
+          {tutorialCategories.map((category) => <button type="button" className={tutorialCategory === category ? "filter-chip active" : "filter-chip"} key={category} onClick={() => setTutorialCategory(category)}>{category}</button>)}
+        </div>
+        <div className="tutorial-layout">
+          <aside className="tutorial-list" aria-label="教程列表">
+            {visibleTutorials.map((tutorial) => <button type="button" className={selectedTutorial?.id === tutorial.id ? "tutorial-card active" : "tutorial-card"} key={tutorial.id} onClick={() => setSelectedTutorialId(tutorial.id)}><span>{tutorial.category} · {tutorial.updatedAt}</span><strong>{tutorial.title}</strong><p>{tutorial.summary}</p><small>{tutorial.tags.join(" · ")}</small></button>)}
+          </aside>
+          {selectedTutorial && <article className="tutorial-reader">
+            <div className="tutorial-reader-head"><span>{selectedTutorial.category}</span><time>更新于 {selectedTutorial.updatedAt}</time></div>
+            <h2>{selectedTutorial.title}</h2><p className="tutorial-summary">{selectedTutorial.summary}</p>
+            <ContentDiscussion key={selectedTutorial.id} contentType="tutorial" contentId={selectedTutorial.id} contentTitle={selectedTutorial.title} authUser={authUser}>
+              <TutorialBody content={selectedTutorial.content} />
+              {selectedTutorial.sources.length > 0 && <div className="tutorial-sources" data-comment-block="sources"><strong>资料来源</strong>{selectedTutorial.sources.map((source) => <a href={source.href} key={source.href} target="_blank" rel="noreferrer">{source.label} ↗</a>)}</div>}
+            </ContentDiscussion>
+          </article>}
+        </div>
+        <details className="changelog-panel"><summary>查看教程更新日志</summary><div>{changelog.map((item) => <article key={`${item.date}-${item.title}`}><time>{item.date}</time><strong>{item.title}</strong><p>{item.detail}</p></article>)}</div></details>
+      </section>
+
       <section className="section article-section" id="articles">
         <div className="section-heading"><div><p className="eyebrow">Column answers</p><h2>从一个问题开始，读一篇能带走的回答。</h2></div><div className="article-tools"><label className="search-field"><span>搜索专栏</span><input type="search" placeholder="输入关键词" value={articleQuery} onChange={(event) => setArticleQuery(event.target.value)} /></label><button type="button" className={selectedColumn === "all" ? "filter-chip active" : "filter-chip"} onClick={() => setSelectedColumn("all")}>全部</button></div></div>
         <div className="article-filter">{columns.map((column) => <button type="button" className={selectedColumn === column.key ? "filter-chip active" : "filter-chip"} key={column.key} onClick={() => setSelectedColumn(column.key)}>{column.label}</button>)}</div>
-        <div className="article-list">{filteredArticles.map((article) => { const column = columns.find((item) => item.key === article.column)!; const isOpen = expandedArticle === article.id; return <article className={isOpen ? "article-row open" : "article-row"} key={article.id}><div className="article-row-main"><div><span className="article-label">{column.label}</span><h3>{article.title}</h3><p>{article.excerpt}</p></div><button type="button" className="icon-button" aria-label={isOpen ? "收起文章" : "展开文章"} onClick={() => setExpandedArticle(isOpen ? null : article.id)}>{isOpen ? "−" : "+"}</button></div>{isOpen && <div className="article-body"><p>{article.body}</p><ul>{article.points.map((point) => <li key={point}>{point}</li>)}</ul></div>}</article> })}</div>
+        <div className="article-list">{filteredArticles.map((article) => { const column = columns.find((item) => item.key === article.column)!; const isOpen = expandedArticle === article.id; return <article className={isOpen ? "article-row open" : "article-row"} key={article.id}><div className="article-row-main"><div><span className="article-label">{column.label}</span><h3>{article.title}</h3><p>{article.excerpt}</p></div><button type="button" className="icon-button" aria-label={isOpen ? "收起文章" : "展开文章"} onClick={() => setExpandedArticle(isOpen ? null : article.id)}>{isOpen ? "−" : "+"}</button></div>{isOpen && <div className="article-body"><ContentDiscussion key={article.id} contentType="article" contentId={article.id} contentTitle={article.title} authUser={authUser}><p data-comment-block="answer">{article.body}</p><ul data-comment-block="points">{article.points.map((point) => <li key={point}>{point}</li>)}</ul></ContentDiscussion></div>}</article> })}</div>
         {filteredArticles.length === 0 && <p className="empty-state">暂时没有匹配的文章，换一个关键词试试。</p>}
       </section>
 
@@ -1377,104 +1630,107 @@ export default function Home() {
       </>}
 
       {activeWorkspace === "car" && <>
-      <section className="section model-section" id="models"><div className="section-heading"><div><p className="eyebrow">ONVO buyer guide</p><h2>乐道车型，放回你的家庭生活里选择。</h2></div><p className="section-lead">车型信息和价格会持续更新，先用场景理解差别，再用计算器把预算边界算清楚。</p></div><div className="model-grid">{(Object.keys(models) as ModelKey[]).map((modelKey) => { const model = models[modelKey]; return <article className="model-card" key={model.name}><div className="model-visual"><img src={model.image} alt="" /><span>{model.visualNote}</span><strong>{model.name}</strong></div><div className="model-card-body"><span>{model.subtitle}</span><h3>{model.name}</h3><p>{model.headline}</p><div className="price-row"><strong>{formatPrice(model.trims[0].vehiclePrice)} 起</strong><small>BaaS {formatPrice(model.trims[0].baasPrice)} 起</small></div><button type="button" onClick={() => { chooseModel(modelKey); selectWorkspace("finance"); }}>放入计算器</button></div></article> })}</div></section>
+      <section className="section brand-data-section" id="brand-data">
+        <div className="section-heading">
+          <div><p className="eyebrow">Brand price watch</p><h2>先看品牌价位，再用自己的成交金额计算。</h2></div>
+          <p className="section-lead">下面整理十条品牌线与代表车型的官方公开价位样本。蔚来公司旗下 NIO、ONVO 乐道、firefly 萤火虫集中展示；价格和权益会变化，请回到官方来源核对。</p>
+        </div>
+        <div className="brand-stat-grid" aria-label="品牌样本统计">
+          <div><span>跟踪品牌线</span><strong>10</strong><small>覆盖主流新能源品牌</small></div>
+          <div><span>价位样本</span><strong>7.98–37.98</strong><small>万元，含 BaaS 起价</small></div>
+          <div><span>计算方式</span><strong>开放输入</strong><small>不再绑定车型</small></div>
+          <div><span>本次核对</span><strong>2026.08</strong><small>最终以官方为准</small></div>
+        </div>
+        <div className="brand-table-wrap">
+          <table className="brand-price-table">
+            <thead><tr><th>品牌归属</th><th>品牌</th><th>车型样本</th><th>官方公开价位样本</th><th>购车结构</th><th>来源</th><th>计算</th></tr></thead>
+            <tbody>
+              {brandReferences.map((brand) => (
+                <tr key={brand.key}>
+                  <td><span className={brand.group === "蔚来公司" ? "brand-group nio" : "brand-group"}>{brand.group}</span></td>
+                  <td><strong>{brand.name}</strong></td>
+                  <td>{brand.representative}</td>
+                  <td>{brand.price}</td>
+                  <td>{brand.structure}</td>
+                  <td><a href={brand.officialUrl} target="_blank" rel="noreferrer">{brand.sourceDate} ↗</a></td>
+                  <td><button type="button" onClick={() => { chooseBrand(brand.key); window.requestAnimationFrame(() => document.getElementById("calculator")?.scrollIntoView({ behavior: "smooth", block: "start" })); }}>选择品牌</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="brand-data-note">口径说明：价位表只做横向观察，贷款本金始终以你填写的“购车金额”为准。蔚来公司旗下三个品牌可打开 BaaS 输入，租电减免和月租都不会自动带入。</p>
+      </section>
+
+      <section className="section car-journey-section" id="car-journey">
+        <div className="section-heading"><div><p className="eyebrow">Buyer journey & notes</p><h2>从打算买车到长期使用，记录都放在汽车专区。</h2></div><p className="section-lead">点击横向阶段会筛选相关记录；交付后的补能、售后与长期服务也在同一区域，不再占用随心记录。</p></div>
+        <div className="journey-dashboard">
+          <section className="timeline-card" id="journey">
+            <div className="timeline-head"><div><p className="eyebrow">Buyer journey</p><h3>购车全周期</h3></div><button type="button" className={selectedStage === "all" ? "filter-chip active" : "filter-chip"} onClick={() => chooseStage("all")}>全部阶段</button></div>
+            <div className="journey-scroll" tabIndex={0} aria-label="横向浏览买车阶段"><ol className="journey-list">{purchaseStages.map((item) => <li key={item.step} className={selectedStage === item.key ? "active" : ""}><button type="button" aria-pressed={selectedStage === item.key} onClick={() => chooseStage(item.key)}><span>{item.step}</span><strong>{item.title}</strong></button></li>)}</ol></div>
+            <div className="journey-active-note" aria-live="polite"><span>{activePurchaseStage ? `阶段 ${activePurchaseStage.step}` : "全部阶段"}</span><strong>{activePurchaseStage?.title ?? "完整购车路径"}</strong><p>{activePurchaseStage?.note ?? "按自己的节奏了解、比较、计算、下单与长期使用。"}</p></div>
+          </section>
+          <section className="delivery-card compact-delivery-card"><p className="eyebrow">Ownership service</p><h3>交付后的用车生命周期</h3><p>交付不是结束。补能、售后、救援、软件升级与日常使用支持，都会影响长期体验和真实成本。</p><ul>{deliveryServices.map((item) => <li key={item}>{item}</li>)}</ul></section>
+        </div>
+        <div className="car-record-layout">
+          <aside className="car-record-list">{carRecords.map((record) => <button type="button" className={selectedCarRecord.id === record.id ? "active" : ""} key={record.id} onClick={() => setSelectedCarRecordId(record.id)}><span>{record.date}</span><strong>{record.title}</strong></button>)}{carRecords.length === 0 && <p className="empty-state">这个阶段暂无记录，可先查看完整周期。</p>}</aside>
+          <article className="daily-entry car-daily-entry"><div className="daily-meta"><span>{selectedCarRecord.date}</span><span>{purchaseStages.find((stage) => stage.key === selectedCarRecord.stage)?.title ?? "汽车记录"}</span>{selectedCarRecord.updatedAt && <span>更新于 {selectedCarRecord.updatedAt}</span>}</div><h3>{selectedCarRecord.title}</h3><ContentDiscussion key={selectedCarRecord.id} contentType="record" contentId={selectedCarRecord.id} contentTitle={selectedCarRecord.title} authUser={authUser}>{selectedCarRecord.content ? <TutorialBody content={selectedCarRecord.content} /> : selectedCarRecord.paragraphs.map((paragraph, paragraphIndex) => <p data-comment-block={`paragraph-${paragraphIndex}`} key={paragraph}>{paragraph}</p>)}<div className="daily-takeaway" data-comment-block="takeaway"><span>记录结论</span><strong>{selectedCarRecord.takeaway}</strong></div></ContentDiscussion></article>
+        </div>
+      </section>
 
       </>}
 
-      {activeWorkspace === "finance" && <section className="section calculator-section" id="calculator">
+      {activeWorkspace === "car" && <section className="section calculator-section" id="calculator">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Price calculator</p>
             <h2>先算贷款，再列首次付款，最后看养车与长期成本。</h2>
           </div>
           <p className="section-lead">
-            页面分成三个步骤：贷款金融、税费保险与首次付款、月持有及持有年限费用。这里是估算工具，最终以门店报价、金融审批和合同为准。
+            直接填写品牌、购车金额和首付比例。页面仍分成贷款金融、税费保险与首次付款、月持有及持有年限费用三个步骤，最终以实际报价、金融审批和合同为准。
           </p>
-        </div>
-
-        <div className="finance-presets" aria-label="金融方案快捷填入">
-          {financePresets.map((preset) => (
-            <button
-              type="button"
-              className={financePlan === preset.key ? "finance-card active" : "finance-card"}
-              key={preset.label}
-              onClick={() => applyFinancePreset(preset)}
-            >
-              <span>{preset.label}</span>
-              <strong>{preset.badge}</strong>
-              <small>{preset.note}</small>
-            </button>
-          ))}
         </div>
 
         <div className="calculator-shell finance-shell">
           <div className="calculator-controls">
             <div className="calculator-step-heading">
               <span>步骤 1</span>
-              <div><h3>贷款金融</h3><p>以包含官方选装和自定义选装后的车辆价格计算月供、总利息、结清金额和 IRR。</p></div>
+              <div><h3>贷款金融</h3><p>不选车型，直接以你填写的含选装购车金额计算月供、总利息、结清金额和 IRR。</p></div>
             </div>
-            <div className="control-group">
-              <span className="control-label">车型</span>
-              <div className="segmented">
-                {(Object.keys(models) as ModelKey[]).map((modelKey) => (
-                  <button type="button" className={selectedModel === modelKey ? "active" : ""} key={modelKey} onClick={() => chooseModel(modelKey)}>
-                    {models[modelKey].name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="control-group">
-              <span className="control-label">版本</span>
-              <div className="trim-grid">
-                {currentModel.trims.map((trim) => (
-                  <button
-                    type="button"
-                    className={currentTrim.name === trim.name ? "trim-card active" : "trim-card"}
-                    key={trim.name}
-                    onClick={() => chooseTrim(trim.name)}
-                  >
-                    <span>{trim.tag}</span>
-                    <strong>{trim.name}</strong>
-                    <small>{purchaseMode === "vehicle" ? formatPrice(trim.vehiclePrice) : `BaaS ${formatPrice(trim.baasPrice)}`}</small>
-                  </button>
-                ))}
-              </div>
+            <div className="control-grid open-finance-grid">
+              <label className="budget-input">
+                <span>汽车品牌</span>
+                <select value={selectedBrand} onChange={(event) => chooseBrand(event.target.value as BrandKey)}>
+                  {brandOptions.map((brand) => <option key={brand.key} value={brand.key}>{brand.label}</option>)}
+                </select>
+              </label>
+              <label className="budget-input">
+                <span>购车金额（含选装）</span>
+                <input min="0" step="1000" type="number" value={manualVehiclePrice === 0 ? "" : manualVehiclePrice} onChange={(event) => setManualVehiclePrice(Math.max(0, Number(event.target.value) || 0))} />
+                <small className="input-help">填写合同或报价单中的车辆金额；蔚来租电减免在下方单独扣除。</small>
+              </label>
             </div>
 
             <div className="plan-summary-card">
               <p className="eyebrow">Plan summary</p>
-              <h3>{selectedFinancePlan.label}</h3>
+              <h3>用户自定义贷款方案</h3>
               <p>{planDescription}</p>
               <div className="plan-summary-meta">
-                <span>计价车辆：{formatPrice(vehicleSubtotal)}</span>
+                <span>计价品牌：{currentBrandLabel}</span>
+                <span>计入贷款车辆金额：{formatPrice(vehicleSubtotal)}</span>
                 <span>分期：{loanTermMonths} 期</span>
                 <span>第 {settlementMonth} 期结清：{formatPrice(settlementAmount)}</span>
               </div>
               <p className="input-help">结清期数只影响贷款成本；下方持有年限只影响用车与持有费用，两者已经分开。</p>
             </div>
 
-            {financePlan === "nio-five-year" && (
-              <label className="budget-input payoff-month-input">
-                <span>免 3 年后结清期数</span>
-                <input min="36" max="60" step="1" type="number" value={fiveYearPayoffMonth} onChange={(event) => setFiveYearPayoffMonth(Math.min(60, Math.max(36, Number(event.target.value) || 36)))} />
-                <small className="input-help">可填第 36–60 期；36 期结清通常不含后 24 期费用，60 期表示按完整 5 年还完。</small>
-              </label>
-            )}
-
-            {financePlan !== "nio-five-year" && (
-              <label className="budget-input payoff-month-input">
-                <span>计划结清期数</span>
-                <input min={Math.max(1, earlyPayoffEligibleMonth)} max={loanTermMonths} step="1" type="number" value={loanPayoffMonth} onChange={(event) => setLoanPayoffMonth(Math.min(loanTermMonths, Math.max(Math.max(1, earlyPayoffEligibleMonth), Number(event.target.value) || 1)))} />
-                <small className="input-help">只用于贷款结清测算，不会改变下方的持有年限。</small>
-              </label>
-            )}
+            <label className="budget-input payoff-month-input">
+              <span>计划结清期数</span>
+              <input min="1" max={loanTermMonths} step="1" type="number" value={loanPayoffMonth} onChange={(event) => setLoanPayoffMonth(Math.min(loanTermMonths, Math.max(1, Number(event.target.value) || 1)))} />
+              <small className="input-help">只用于贷款结清测算。是否允许提前结清以及违约金，请按你的合同确认。</small>
+            </label>
 
             <div className="control-grid finance-essential-grid">
-              <label className="budget-input">
-                <span>车辆成交价 / BaaS 车价</span>
-                <input min="0" step="1000" type="number" value={manualVehiclePrice === 0 ? "" : manualVehiclePrice} onChange={(event) => setManualVehiclePrice(Math.max(0, Number(event.target.value) || 0))} />
-              </label>
               <label className="budget-input">
                 <span>首付比例</span>
                 <input min="0" max="100" step="5" type="number" value={downPaymentRate === 0 ? "" : downPaymentRate} onChange={(event) => setDownPaymentRate(Math.min(100, Math.max(0, Number(event.target.value) || 0)))} />
@@ -1486,66 +1742,45 @@ export default function Home() {
               </label>
             </div>
 
-            {financePlan === "custom" && (
-              <div className="control-grid custom-finance-grid">
+            <div className="control-grid custom-finance-grid">
                 <label className="budget-input">
                   <span>分期年限（贷款合同）</span>
-                  <input min="0" max="8" step="1" type="number" value={financeYears === 0 ? "" : financeYears} onChange={(event) => { switchToCustomPlan(); setFinanceYears(Math.min(8, Math.max(0, Number(event.target.value) || 0))); }} />
+                  <input min="0" max="8" step="1" type="number" value={financeYears === 0 ? "" : financeYears} onChange={(event) => { const years = Math.min(8, Math.max(0, Number(event.target.value) || 0)); setFinanceYears(years); setLoanPayoffMonth(Math.max(1, years * 12)); }} />
                 </label>
                 <label className="budget-input">
-                  <span>方案标示年化费率</span>
-                  <input min="0" max="24" step="0.1" type="number" value={annualRate === 0 ? "" : annualRate} onChange={(event) => { switchToCustomPlan(); setAnnualRate(Math.min(24, Math.max(0, Number(event.target.value) || 0))); }} />
+                  <span>年化利率（合同口径）</span>
+                  <input min="0" max="24" step="0.1" type="number" value={annualRate === 0 ? "" : annualRate} onChange={(event) => setAnnualRate(Math.min(24, Math.max(0, Number(event.target.value) || 0)))} />
+                  <small className="input-help">直接填写金融机构明示的年化利率；不同品牌与时期的方案由你按实际合同输入。</small>
                 </label>
+              </div>
+
+            {nioGroupBrands.includes(selectedBrand) && (
+              <div className="nio-baas-panel">
+                <div className="control-group">
+                  <span className="control-label">蔚来公司品牌购买方式</span>
+                  <div className="segmented">
+                    <button type="button" className={purchaseMode === "vehicle" ? "active" : ""} onClick={() => switchPurchaseMode("vehicle")}>整车购买</button>
+                    <button type="button" className={purchaseMode === "baas" ? "active" : ""} onClick={() => switchPurchaseMode("baas")}>BaaS 电池租用</button>
+                  </div>
+                </div>
+                {purchaseMode === "baas" && (
+                  <label className="budget-input battery-reduction-input">
+                    <span>租电减免金额</span>
+                    <input min="0" max={manualVehiclePrice} step="1000" type="number" value={batteryReduction === 0 ? "" : batteryReduction} onChange={(event) => setBatteryReduction(Math.min(manualVehiclePrice, Math.max(0, Number(event.target.value) || 0)))} placeholder="请按实际方案填写" />
+                    <small className="input-help">不自动填入。计入贷款的车辆金额 = 购车金额 − 你填写的租电减免。</small>
+                  </label>
+                )}
               </div>
             )}
 
             <div className="control-group">
-              <span className="control-label">购买方式</span>
-              <div className="segmented">
-                <button type="button" className={purchaseMode === "vehicle" ? "active" : ""} onClick={() => switchPurchaseMode("vehicle")}>整车购买</button>
-                <button type="button" className={purchaseMode === "baas" ? "active" : ""} onClick={() => switchPurchaseMode("baas")}>BaaS 电池租用</button>
-              </div>
-            </div>
-
-            {financePlan === "custom" && (
-              <div className="control-group">
                 <span className="control-label">金融方案</span>
                 <div className="segmented">
-                  <button type="button" className={financeMode === "equal-payment" ? "active" : ""} onClick={() => { switchToCustomPlan(); setFinanceMode("equal-payment"); }}>等额本息</button>
-                  <button type="button" className={financeMode === "equal-principal" ? "active" : ""} onClick={() => { switchToCustomPlan(); setFinanceMode("equal-principal"); }}>等额本金</button>
-                  <button type="button" className={financeMode === "interest-free" ? "active" : ""} onClick={() => { switchToCustomPlan(); setFinanceMode("interest-free"); setAnnualRate(0); }}>免息分期</button>
+                  <button type="button" className={financeMode === "equal-payment" ? "active" : ""} onClick={() => setFinanceMode("equal-payment")}>等额本息</button>
+                  <button type="button" className={financeMode === "equal-principal" ? "active" : ""} onClick={() => setFinanceMode("equal-principal")}>等额本金</button>
+                  <button type="button" className={financeMode === "interest-free" ? "active" : ""} onClick={() => { setFinanceMode("interest-free"); setAnnualRate(0); }}>免息分期</button>
                 </div>
               </div>
-            )}
-
-            <details className="calculator-details">
-              <summary>选装配置（计入车辆价格）</summary>
-              <div className="calculator-details-body">
-                <label className="budget-input">
-                  <span>自定义选装预算</span>
-                  <input min="0" step="1000" type="number" value={customBudget === 0 ? "" : customBudget} onChange={(event) => setCustomBudget(Math.max(0, Number(event.target.value) || 0))} />
-                </label>
-                <div className="control-group">
-                  <span className="control-label">官方选装配置</span>
-                  {visibleOptions.length > 0 ? (
-                    <div className="option-list">
-                      {visibleOptions.map((option) => {
-                        const disabled = option.excludedTrim === currentTrim.name;
-                        const selected = selectedOptions.includes(option.id) && !disabled;
-                        return (
-                          <button type="button" className={selected ? "option-row active" : "option-row"} key={option.id} disabled={disabled} onClick={() => toggleOption(option)}>
-                            <span><strong>{option.label}</strong><small>{disabled ? "当前版本已包含" : option.note}</small></span>
-                            <b>{disabled ? "标配" : `+${formatPrice(option.price)}`}</b>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="muted-note">当前车型没有录入官方单项选装价格，可在自定义选装预算里单独填写。</p>
-                  )}
-                </div>
-              </div>
-            </details>
 
             <details className="calculator-details bill-details">
               <summary>账单信息（可选）</summary>
@@ -1556,7 +1791,7 @@ export default function Home() {
               </label>
               <label className="budget-input">
                 <span>账单标题</span>
-                <input type="text" value={billTitle} onChange={(event) => setBillTitle(event.target.value)} placeholder="例如：L60 购车金融账单" />
+                <input type="text" value={billTitle} onChange={(event) => setBillTitle(event.target.value)} placeholder="例如：家庭购车金融账单" />
               </label>
               <label className="budget-input bill-note">
                 <span>账单备注</span>
@@ -1567,13 +1802,12 @@ export default function Home() {
           </div>
 
           <aside className="estimate-panel finance-panel">
-            <span className="estimate-kicker">{currentModel.name} {currentTrim.name} · {purchaseMode === "baas" ? "BaaS 租电" : "整车购买"}</span>
+            <span className="estimate-kicker">{currentBrandLabel} · {nioBaasEnabled ? "BaaS 租电" : "整车购买"}</span>
             <strong className="estimate-total">{formatPrice(monthlyLoanPayment)}<small>/ 月</small></strong>
             <p>当前贷款方案的参考月供；持有和用车费用在下方单独计算。</p>
 
             <div className="total-interest-summary">
               <div><span>按当前结清期数的总利息</span><strong>{formatPrice(interestPaidThroughSettlement)}</strong></div>
-              {financePlan === "nio-five-year" && <div><span>满 60 期总利息</span><strong>{formatPrice(loanQuote.totalInterest)}</strong><small>贷款金额 × 3% × 2 年</small></div>}
             </div>
 
             <div className="finance-tab-list" role="tablist" aria-label="金融结果切换">
@@ -1593,9 +1827,7 @@ export default function Home() {
                   <div className="irr-metric"><span>综合年化融资成本（IRR）</span><strong>{formatIrr(loanIrrPercent)}</strong></div>
                 </div>
                 <p className="input-help irr-note">
-                  {financePlan === "nio-five-year"
-                    ? "5.64% 是 3% 平息费率的参考折算年化，不等同于任意结清期数下的实际 IRR。综合年化融资成本仍按贷款本金、相关费用与每期还款现金流反推；最终以金融机构明示表和合同为准。"
-                    : "综合年化融资成本按贷款本金、相关费用与每期还款现金流反推，更适合比较不同方案；最终以金融机构明示表和合同为准。"}
+                  综合年化融资成本按贷款本金、相关费用与每期还款现金流反推，更适合比较不同方案；最终以金融机构明示表、提前结清规则和合同为准。
                 </p>
               </>
             ) : (
@@ -1622,13 +1854,14 @@ export default function Home() {
               </div>
             </div>
 
-            <a href={currentModel.officialUrl} target="_blank" rel="noreferrer">查看乐道官网 →</a>
+            {currentBrandReference && <a href={currentBrandReference.officialUrl} target="_blank" rel="noreferrer">核对该品牌价格来源 →</a>}
             <div className="bill-actions">
               <button type="button" onClick={saveCurrentBill}>保存到账单库</button>
               <button type="button" onClick={() => exportCurrentBill("csv")}>导出表格 CSV</button>
               <button type="button" onClick={() => exportCurrentBill("html")}>导出文档 HTML</button>
             </div>
-            <p className="muted-note">保存内容会留在当前浏览器里，导出的表格和文档可直接发给家人、顾问或自己留档。</p>
+            {billSaveStatus && <p className="bill-save-status" role="status">{billSaveStatus}</p>}
+            <p className="muted-note">{authUser ? "当前为云端保存，登录同一账户即可跨设备查看。" : "未登录时只保存在当前浏览器；登录后可跨设备保存。"} 导出的表格和文档可直接发给家人、顾问或自己留档。</p>
           </aside>
         </div>
 
@@ -1697,11 +1930,13 @@ export default function Home() {
                   <input min="0" max="10" step="1" type="number" value={ownershipYears === 0 ? "" : ownershipYears} onChange={(event) => setOwnershipYears(Math.min(10, Math.max(0, Number(event.target.value) || 0)))} />
                   <small className="input-help">用于计算这段时间内的总用车费用。</small>
                 </label>
-                <label className="budget-input">
-                  <span>BaaS 电池月租</span>
-                  <input min="0" step="50" type="number" value={batteryRentMonthly === 0 ? "" : batteryRentMonthly} onChange={(event) => setBatteryRentMonthly(Math.max(0, Number(event.target.value) || 0))} disabled={purchaseMode !== "baas"} />
-                  <small className="input-help">当前为{purchaseMode === "baas" ? "租电方案，已计入" : "整车购买，不计入月持有费用"}。</small>
-                </label>
+                {nioBaasEnabled && (
+                  <label className="budget-input">
+                    <span>BaaS 电池月租</span>
+                    <input min="0" step="50" type="number" value={batteryRentMonthly === 0 ? "" : batteryRentMonthly} onChange={(event) => setBatteryRentMonthly(Math.max(0, Number(event.target.value) || 0))} />
+                    <small className="input-help">请按实际合同填写，计入月持有费用。</small>
+                  </label>
+                )}
                 <label className="budget-input">
                   <span>月充电 / 换电</span>
                   <input min="0" step="50" type="number" value={chargingMonthly === 0 ? "" : chargingMonthly} onChange={(event) => setChargingMonthly(Math.max(0, Number(event.target.value) || 0))} />
@@ -1771,7 +2006,7 @@ export default function Home() {
               <h3>计算口径</h3>
               <p>等额本息：月供 = 本金 × 月利率 × (1 + 月利率)^期数 ÷ [(1 + 月利率)^期数 - 1]。</p>
               <p>等额本金：每月偿还固定本金，利息按剩余本金递减。免息分期：贷款本金 ÷ 分期期数。</p>
-              <p>购置税估算：含税成交价先按增值税折算率还原为不含税计税价，再按所选税收口径估算。BaaS 月租作为长期月度成本单独展示。</p>
+              <p>购置税估算：含税成交价先按增值税折算率还原为不含税计税价，再按所选税收口径估算。蔚来公司品牌的 BaaS 减免由用户手动填写，月租作为长期月度成本单独展示。</p>
               <p>综合年化融资成本采用 IRR 复利口径，默认把金融服务费视为放款当期由借款人承担的贷款相关费用。<a href="https://xining.pbc.gov.cn/goutongjiaoliu/113456/113469/2025092212551432728/index.html" target="_blank" rel="noreferrer">查看中国人民银行口径 →</a></p>
             </section>
           </div>
@@ -1814,46 +2049,130 @@ export default function Home() {
         </div>
       </section>}
 
-      {activeWorkspace === "car" && <>
-      <section className="section scenario-section" id="scenarios"><div className="section-heading"><div><p className="eyebrow">Lifestyle match</p><h2>按家庭和生活方式，而不是按参数表开始。</h2></div></div><div className="scenario-layout"><div className="scenario-tabs">{(Object.keys(scenarios) as ScenarioKey[]).map((key) => <button type="button" className={selectedScenario === key ? "active" : ""} key={key} onClick={() => { setSelectedScenario(key); chooseModel(scenarios[key].model); }}>{scenarios[key].label}</button>)}</div><article className="scenario-story"><span>推荐重点看 {models[scenario.model].name}</span><h3>{scenario.title}</h3><p>{scenario.story}</p><ul>{scenario.checklist.map((item) => <li key={item}>{item}</li>)}</ul></article></div></section>
-
-      <section className="section highlights-section" id="highlights"><div className="section-heading"><div><p className="eyebrow">Model highlights</p><h2>车型亮点要讲成家人能听懂的话。</h2></div></div><div className="highlight-grid">{(Object.keys(models) as ModelKey[]).map((modelKey) => <article className="highlight-card" key={modelKey}><span>{models[modelKey].name}</span><h3>{models[modelKey].lifestyle}</h3><ul>{models[modelKey].highlights.map((item) => <li key={item}>{item}</li>)}</ul><p>{models[modelKey].advisorNote}</p></article>)}</div></section>
-
-      <section className="section source-section">
-        <div>
-          <p className="eyebrow">Sources</p>
-          <h2>价格、税费和金融口径都尽量从官方来。</h2>
+      {activeWorkspace === "home" && <section className="contact-section" id="contact">
+        <div className="contact-copy">
+          <p className="eyebrow">Contact</p>
+          <h2>想交流一个问题，或者给这间工作室提建议，可以从这里开始。</h2>
+          <p>如果你有建议、遇到问题，或者希望我补充某项工具与内容，可以直接留言。留言会进入我的反馈列表，不会公开展示。</p>
+          <div className="contact-methods">{contactMethods.map((method) => <a className="contact-method" href={method.href} key={method.label} target={method.label === "小红书号" ? "_blank" : undefined} rel={method.label === "小红书号" ? "noreferrer" : undefined}><span>{method.label}</span><strong>{method.value}</strong></a>)}</div>
         </div>
-        <ul>
-          {(Object.keys(models) as ModelKey[]).map((modelKey) => (
-            <li key={modelKey}>
-              <a href={models[modelKey].officialUrl} target="_blank" rel="noreferrer">
-                {models[modelKey].name}
-              </a>
-              <span>{models[modelKey].sourceLabel}</span>
-            </li>
-          ))}
-          <li>
-            <a href="https://www.onvo.cn/news" target="_blank" rel="noreferrer">乐道官网新闻</a>
-            <span>用于核对上市、价格、权益和车型定位。</span>
-          </li>
-          <li>
-            <a href="https://hq.mof.gov.cn/tongzhitonggao/202307/t20230704_3894319.htm" target="_blank" rel="noreferrer">新能源车购置税政策</a>
-            <span>2026-2027 年新能源乘用车减半征收购置税，每辆减税额不超过 1.5 万元。</span>
-          </li>
-          <li>
-            <a href="https://www.bankofchina.com/pbservice/pb2/200806/t20080625_714_76.htm" target="_blank" rel="noreferrer">汽车贷款还款方式</a>
-            <span>等额本息、等额本金等还款方式的常见银行口径参考。</span>
-          </li>
-          <li>
-            <a href="https://www.onvo.cn/testimonials/20250211012" target="_blank" rel="noreferrer">乐道 BaaS 月租参考</a>
-            <span>官方社区内容中提到 60 度 599 元/月、85 度 899 元/月的租电参考。</span>
-          </li>
-        </ul>
-      </section>
-      </>}
+        <form className="feedback-card" onSubmit={submitFeedback} aria-labelledby="feedback-heading">
+          <p className="eyebrow">Feedback</p>
+          <h3 id="feedback-heading">留言与建议</h3>
+          <p className="feedback-note">提交前请不要填写身份证号、银行卡号或其他不必要的敏感信息。</p>
+          <label className="feedback-field"><span>你想告诉我什么？</span><select value={feedbackType} onChange={(event) => setFeedbackType(event.target.value as FeedbackType)}><option value="suggestion">功能建议</option><option value="question">想问一个问题</option><option value="experience">使用体验</option></select></label>
+          <label className="feedback-field"><span>留言内容</span><textarea required minLength={2} maxLength={2000} rows={5} value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} placeholder="例如：希望补充某个主题、工具，或者哪里使用起来不顺手。" /></label>
+          <label className="feedback-field"><span>联系方式（选填）</span><input type="text" maxLength={200} value={feedbackContact} onChange={(event) => setFeedbackContact(event.target.value)} placeholder="邮箱、微信号或手机号，方便我回复你" /></label>
+          <label className="feedback-honeypot" aria-hidden="true">网站<input tabIndex={-1} autoComplete="off" value={feedbackWebsite} onChange={(event) => setFeedbackWebsite(event.target.value)} /></label>
+          <button className="feedback-submit" type="submit" disabled={feedbackStatus === "sending"}>{feedbackStatus === "sending" ? "正在提交…" : "提交留言"}</button>
+          {feedbackStatusText && <p className={feedbackStatus === "success" ? "feedback-status success" : "feedback-status error"} role="status">{feedbackStatusText}</p>}
+        </form>
+        {authUser?.role === "admin" && (
+          <aside className="admin-inbox" aria-labelledby="admin-inbox-heading">
+            <div className="admin-inbox-head">
+              <div>
+                <p className="eyebrow">Admin inbox</p>
+                <h3 id="admin-inbox-heading">文章讨论、留言与用户账单</h3>
+                <p>文章讨论可以审核、隐藏并原位回复；账单仅展示用户主动保存到云端的内容。</p>
+              </div>
+              <button type="button" onClick={loadAdminInbox}>{adminInboxOpen ? "刷新收件箱" : "打开收件箱"}</button>
+            </div>
+            {adminInboxOpen && (
+              <div className="admin-inbox-grid">
+                <section className="admin-comment-section">
+                  <div className="admin-list-title"><strong>文章讨论</strong><span>{adminCommentItems.length} 条</span></div>
+                  {adminCommentItems.length > 0 ? adminCommentItems.slice(0, 30).map((item) => (
+                    <article className="admin-inbox-item admin-comment-item" key={item.id}>
+                      <div><strong>{commentCategoryLabels[item.category] ?? "互动"} · {item.status === "pending" ? "待审核" : item.status === "published" ? "已公开" : "已隐藏"}</strong><time>{item.createdAt}</time></div>
+                      <small>{item.contentTitle} · {item.authorName}</small>
+                      {item.anchorText && <blockquote>“{item.anchorText}”</blockquote>}
+                      <p>{item.message}</p>
+                      <div className="admin-comment-actions">
+                        {item.status !== "published" && <button type="button" onClick={() => void updateAdminCommentStatus(item.id, "published")}>公开</button>}
+                        {item.status !== "hidden" && <button type="button" onClick={() => void updateAdminCommentStatus(item.id, "hidden")}>隐藏</button>}
+                      </div>
+                      {!item.parentId && <div className="admin-inline-reply"><textarea rows={2} value={adminReplyDrafts[item.id] ?? ""} onChange={(event) => setAdminReplyDrafts((current) => ({ ...current, [item.id]: event.target.value }))} placeholder={item.status === "published" ? "写下回复并公开到原文…" : "先公开原留言，再进行回复"} disabled={item.status !== "published"} /><button type="button" onClick={() => void replyToAdminComment(item)} disabled={item.status !== "published"}>回复并公开</button></div>}
+                    </article>
+                  )) : <p className="admin-empty">目前还没有文章讨论。</p>}
+                </section>
+                <section>
+                  <div className="admin-list-title"><strong>最新留言</strong><span>{adminFeedbackItems.length} 条</span></div>
+                  {adminFeedbackItems.length > 0 ? adminFeedbackItems.slice(0, 20).map((item) => (
+                    <article className="admin-inbox-item" key={item.id}>
+                      <div><strong>{item.type}</strong><time>{item.createdAt}</time></div>
+                      <p>{item.message}</p>
+                      <small>{item.userEmail || item.contact || "匿名留言"}</small>
+                    </article>
+                  )) : <p className="admin-empty">目前还没有留言。</p>}
+                </section>
+                <section>
+                  <div className="admin-list-title"><strong>云端账单</strong><span>{adminBillItems.length} 份</span></div>
+                  {adminBillItems.length > 0 ? adminBillItems.slice(0, 20).map((item) => (
+                    <article className="admin-inbox-item" key={item.id}>
+                      <div><strong>{item.title}</strong><time>{item.createdAt}</time></div>
+                      <p>{item.snapshot.currentModelName} · {item.snapshot.currentTrimName} · {formatPrice(item.snapshot.ownershipTotal)}</p>
+                      <small>{item.userEmail || "未知账户"}</small>
+                    </article>
+                  )) : <p className="admin-empty">目前还没有云端账单。</p>}
+                </section>
+              </div>
+            )}
+          </aside>
+        )}
+      </section>}
 
-      {activeWorkspace === "home" && <section className="contact-section" id="contact"><div><p className="eyebrow">Contact</p><h2>想看车、试驾，或者想把一个生活问题聊清楚，可以从这里开始。</h2></div><div className="contact-methods">{contactMethods.map((method) => <a className="contact-method" href={method.href} key={method.label} target={method.label === "小红书号" ? "_blank" : undefined} rel={method.label === "小红书号" ? "noreferrer" : undefined}><span>{method.label}</span><strong>{method.value}</strong></a>)}</div></section>}
+      <footer className="site-footer">
+        <div><strong>周多福个人工作室</strong><span>教程 · 记录 · 开放工具</span></div>
+        <p>累计访问 <strong>{visitCount === null ? "—" : new Intl.NumberFormat("zh-CN").format(visitCount)}</strong> 次 · 仅统计总访问次数，不记录访客身份</p>
+      </footer>
+
+      {authOpen && (
+        <div className="auth-backdrop" role="presentation" onMouseDown={() => setAuthOpen(false)}>
+          <section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-heading" onMouseDown={(event) => event.stopPropagation()}>
+            <button className="auth-close" type="button" onClick={() => setAuthOpen(false)} aria-label="关闭账户窗口">×</button>
+            {authUser ? (
+              <div className="account-summary">
+                <p className="eyebrow">My account</p>
+                <h2 id="auth-dialog-heading">我的账户</h2>
+                <div className="account-email"><span>登录邮箱</span><strong>{authUser.email}</strong></div>
+                <p>你的账单会保存在云端，登录同一账户即可跨设备查看。你仍然可以逐份删除自己的账单。</p>
+                <div className="auth-actions">
+                  {authUser.role === "admin" && <button type="button" className="auth-primary" onClick={() => { setAuthOpen(false); goToContact(); void loadAdminInbox(); }}>查看管理员收件箱</button>}
+                  <button type="button" className="auth-secondary" onClick={logoutUser}>退出登录</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="eyebrow">Cloud account</p>
+                <h2 id="auth-dialog-heading">{authMode === "login" ? "登录并继续查看账单" : "创建你的云端账户"}</h2>
+                <p className="auth-intro">不登录也能使用计算器；只有需要跨设备保存账单时才需要账户。</p>
+                <div className="auth-tabs" role="tablist" aria-label="账户操作">
+                  <button type="button" className={authMode === "login" ? "active" : ""} onClick={() => { setAuthMode("login"); setAuthStatusText(""); }}>登录</button>
+                  <button type="button" className={authMode === "register" ? "active" : ""} onClick={() => { setAuthMode("register"); setAuthStatusText(""); }}>注册</button>
+                </div>
+                <form className="auth-form" onSubmit={submitAuth}>
+                  <label><span>邮箱</span><input required type="email" autoComplete="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="name@example.com" /></label>
+                  <label><span>密码</span><input required minLength={8} type="password" autoComplete={authMode === "login" ? "current-password" : "new-password"} value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="至少 8 位" /></label>
+                  {authMode === "register" && (
+                    <div className="service-notice">
+                      <strong>注册前请确认</strong>
+                      <ul>
+                        <li>你主动保存的账单会存入云端，用于跨设备查看和继续计算。</li>
+                        <li>网站管理员可以查看账单摘要及你主动提交的留言；文章批注经审核后会公开显示。</li>
+                        <li>请不要在账单或留言中填写身份证、银行卡等不必要的敏感信息。</li>
+                        <li>你可以随时删除自己的单份账单；账户注销功能将在后续版本提供。</li>
+                      </ul>
+                      <label className="auth-consent"><input type="checkbox" checked={authConsent} onChange={(event) => setAuthConsent(event.target.checked)} /><span>我已阅读并同意以上服务提示</span></label>
+                    </div>
+                  )}
+                  <button className="auth-primary" type="submit" disabled={authSubmitting}>{authSubmitting ? "正在处理…" : authMode === "login" ? "登录" : "同意并注册"}</button>
+                  {authStatusText && <p className="auth-status" role="status">{authStatusText}</p>}
+                </form>
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </main>
   );
 }

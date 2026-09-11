@@ -11,33 +11,24 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     metadataBase,
-    title: "周多福 | 购车、效率与生活经验",
+    title: "周多福 | 个人工作室",
     description:
-      "周多福的个人经验工作室，长期分享乐道购车建议、AI 效率工具、信息获取方法与生活选择。",
+      "周多福的个人知识与工具网站：实用教程、来源整理、随心记录、汽车数据与开放金融计算。",
     icons: {
       icon: "/favicon.svg",
       shortcut: "/favicon.svg",
     },
     openGraph: {
-      title: "周多福 | 购车、效率与生活经验",
+      title: "周多福 | 个人工作室",
       description:
-        "从真实生活场景出发，分享购车判断、效率经验、信息方法与长期选择。",
+        "把复杂问题整理成可以直接使用的教程与工具。",
       type: "website",
-      images: [
-        {
-          url: "/og.png",
-          width: 1200,
-          height: 630,
-          alt: "周多福个人经验工作室预览图",
-        },
-      ],
     },
     twitter: {
-      card: "summary_large_image",
-      title: "周多福 | 购车、效率与生活经验",
+      card: "summary",
+      title: "周多福 | 个人工作室",
       description:
-        "购车建议、AI 效率工具、信息获取和生活经验。",
-      images: ["/og.png"],
+        "实用教程、来源整理、真实记录与开放工具。",
     },
   };
 }
