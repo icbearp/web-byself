@@ -1,5 +1,28 @@
 [
   {
+    "id": "大麦票务",
+    "title": "大麦票务",
+    "summary": "偶尔想去看一场演唱会，但往往很难抢到门票，也很影响计划。所以需要一定的技术，那就开始吧。",
+    "tags": [
+      "大麦票务",
+      "抢票脚本"
+    ],
+    "publishedAt": "2026-10-12",
+    "updatedAt": "2026-10-12",
+    "content": "多福朋友也是很爱音乐的人，但往往抢不到，多福的号以前抢票很好，帮抢的多了就触发了限制，不得不尝试使用科技。\n**下面就开始演示教程：**\n在Github上的HaTickets写了一个方案（ [Mobile(U2) / Desktop(Tauri+Rust) 方案](https://github.com/currycan/HaTickets)）。\n✅ 适合你：有一台安卓真机、能用命令行（会敲 adb / poetry）、想给自己或家人抢票。 ⛔ 不适合你：没有安卓真机（iOS / 纯 PC / Mac 无真机都跑不了）、完全没碰过命令行、或期待“装个 App 点一下就抢”。这是一套需要动手配置的自动化工具，不是开箱即用的成品软件。\n从 [Android 官方](https://developer.android.com/tools/releases/platform-tools)页面下载 Windows 版 Platform-Tools，解压后把其中的 platform-tools 文件夹加入系统 PATH；按 [Poetry 官方](https://python-poetry.org/docs/#installation)安装说明安装 Poetry。重开 PowerShell，运行 adb devices 和 poetry --version。前者应显示一行以 device 结尾的手机记录。\n上述内容虽然看起来非常专业，但是我们有上帝的大脑**Codex**，我们可以交给它，完成以下内容，并将其完善。\n把Github项目链接交给Codex，下载项目，再提示Codex补充电脑环境，最后进行配置的本地编写。这个过程很容易，接下来就是等Codex跑完全程。等待抢票即可。\n后续多福将继续完善这个项目，期待一下吧。",
+    "sources": [
+      {
+        "label": "方案来源",
+        "href": "https://github.com/currycan/HaTickets"
+      },
+      {
+        "label": "工具",
+        "href": "https://chatgpt.com/"
+      }
+    ],
+    "category": "演唱会门票"
+  },
+  {
     "id": "零基础科学上网指南-机场原理-订阅机制与保姆级配置教程",
     "title": "零基础科学上网指南：机场原理、订阅机制与保姆级配置教程",
     "summary": "在网络日常使用中，访问国际学术资源、跨境电商、GitHub、流媒体平台（如 YouTube 4K、Netflix）或使用 ChatGPT 等 AI 工具时，经常会遇到网络受限的情况。本文将拆解“机场”与“订阅”的工作原理，并以熊云为例，带你完成从注册到客户端配置的全流程。",
