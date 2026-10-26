@@ -3,3 +3,6 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   workerd: true
+# 构建环境若不读取或不认可 allowBuilds，被跳过的安装脚本只给警告，不让安装失败。
+# esbuild、workerd 通过平台二进制包工作，跳过安装脚本不影响构建。
+strictDepBuilds: false
