@@ -9,27 +9,31 @@ import { ContentDiscussion, type AuthUser } from "./discussion";
 import { BeijingClock, HeroArt } from "./hero-art";
 import { useReveal, useWorkspaceTransition } from "./motion";
 
-type WorkspaceKey = "home" | "tutorials" | "records" | "about";
+type WorkspaceKey = "home" | "tutorials" | "records";
 type Tone = "sky" | "lilac" | "mint";
 type ColumnKey = "tools" | "efficiency" | "information" | "life";
 type RecordCategoryKey = "career-growth" | "life-efficiency" | "side-project";
 type FeedbackType = "suggestion" | "question" | "experience";
 
-export const workspacePaths: Record<WorkspaceKey, string> = { home: "/", tutorials: "/tutorials", records: "/records", about: "/about" };
+export const workspacePaths: Record<WorkspaceKey, string> = { home: "/", tutorials: "/tutorials", records: "/records" };
 
 function workspaceFromPath(pathname: string): WorkspaceKey {
   const match = (Object.entries(workspacePaths) as Array<[WorkspaceKey, string]>).find(([key, path]) => key !== "home" && (pathname === path || pathname.startsWith(`${path}/`)));
   return match?.[0] ?? "home";
 }
 
-const workspaceTabs: Array<{ key: WorkspaceKey; label: string }> = [
-  { key: "home", label: "首页" },
-  { key: "tutorials", label: "教程" },
-  { key: "records", label: "随心记录" },
-  { key: "about", label: "关于" },
+// 首页是一条从上到下的个人主页流程；教程和记录内容多，单独成页。
+const navItems: Array<{ label: string; workspace: WorkspaceKey; target: string; href: string }> = [
+  { label: "首页", workspace: "home", target: "top", href: "/" },
+  { label: "内容", workspace: "home", target: "content", href: "/#content" },
+  { label: "经历", workspace: "home", target: "journey", href: "/#journey" },
+  { label: "教程", workspace: "tutorials", target: "top", href: "/tutorials" },
+  { label: "记录", workspace: "records", target: "top", href: "/records" },
+  { label: "联系", workspace: "home", target: "contact", href: "/#contact" },
 ];
 
-const tones: Tone[] = ["sky", "lilac", "mint"];
+// 首页各区块对应的导航项：三件事算“首页”，致访客的信算“经历”。
+const HOME_ANCHORS: Record<string, string> = { top: "top", doing: "top", content: "content", journey: "journey", letter: "journey", contact: "contact" };
 
 const profile = {
   name: "周多福",
@@ -44,23 +48,28 @@ const contactMethods = [
   { label: "电话", value: "15993551315", href: "tel:15993551315", external: false },
 ];
 
-const offerings: Array<{ key: string; tone: Tone; label: string; title: string; copy: string; gets: string; cta: string; workspace: WorkspaceKey; target?: string }> = [
-  { key: "tutorials", tone: "sky", label: "实用教程", title: "照着做，就能完成", copy: "从网络与隐私、内容搜集到工具配置，每篇都保留步骤、适用边界和可以核对的来源。", gets: "步骤 · 边界 · 来源", cta: "浏览教程", workspace: "tutorials" },
-  { key: "records", tone: "lilac", label: "随心记录", title: "把判断写下来", copy: "职场选择、生活效率和业余实践。不追求日更，有真实经历和新判断时才写。", gets: "经历 · 判断 · 复盘", cta: "阅读记录", workspace: "records" },
-  { key: "methods", tone: "mint", label: "效率方法", title: "少一点重复消耗", copy: "沟通、阅读、复盘和 AI 工作流里真正用过的方法，拆成可以直接套用的步骤。", gets: "清单 · 模板 · 工作流", cta: "查看方法", workspace: "tutorials", target: "efficiency" },
+const focusWords = ["职场选择", "效率方法", "信息判断", "个人成长"];
+
+const heroStickers = ["保持独立判断", "LONG TERM", "把方法留下来", "KEEP LEARNING"];
+
+const tickerItems = ["实用教程", "随心记录", "效率方法", "保持独立判断", "把复杂问题讲清楚", "LEARN IN PUBLIC", "把方法留下来"];
+
+const doing: Array<{ en: string; title: string; copy: string; cta: string; workspace: WorkspaceKey; target?: string }> = [
+  { en: "write", title: "写教程", copy: "把一个问题从头做到尾，留下步骤、适用边界和可以核对的来源。", cta: "看教程", workspace: "tutorials" },
+  { en: "record", title: "记判断", copy: "职场选择、生活效率和业余实践。不追求日更，有真实经历才写。", cta: "读记录", workspace: "records" },
+  { en: "refine", title: "磨方法", copy: "沟通、阅读、复盘里真正用过的方法，拆成可以直接套用的清单。", cta: "看方法", workspace: "tutorials", target: "efficiency" },
 ];
 
-const principles = [
-  { index: "01", key: "结果", title: "先给结果", note: "再解释原因" },
-  { index: "02", key: "来源", title: "写清来源", note: "标注时间与口径" },
-  { index: "03", key: "验证", title: "小步验证", note: "按反馈修正" },
-  { index: "04", key: "更新", title: "持续更新", note: "旧内容也会回头修" },
+const journey: Array<{ when: string; title: string; copy: string; tags: string[]; current?: boolean }> = [
+  { when: "过去", title: "一线销售", copy: "在真实用户、价格与服务之间，积累沟通、需求梳理和决策支持的经验。", tags: ["沟通表达", "需求梳理", "决策支持", "客户服务"] },
+  { when: "转折", title: "重新选择边界", copy: "离开长期不可持续的工作节奏，重新审视健康、权益与个人发展的关系。", tags: ["健康优先", "劳动权益", "长期主义"] },
+  { when: "现在进行时", title: "个人知识工作室", copy: "把经历整理为教程、方法和有来源的记录，让解决问题的能力持续积累。", tags: ["实用教程", "随心记录", "效率方法", "网站搭建"], current: true },
 ];
 
-const careerPath = [
-  { index: "01", title: "一线销售", copy: "在真实用户、价格与服务之间，积累沟通、需求梳理和决策支持的经验。" },
-  { index: "02", title: "重新选择边界", copy: "离开长期不可持续的工作节奏，重新审视健康、权益与个人发展的关系。" },
-  { index: "03", title: "个人知识工作室", copy: "把经历整理为教程、方法和有来源的记录，让解决问题的能力持续积累。" },
+const letter = [
+  "这个网站是我给自己留的一块长期园地：记录经历、整理方法，也存放那些值得反复回看的判断。如果其中某一篇刚好帮你少走一点弯路，那就是它最好的用处。",
+  "我相信普通人的复利来自好好选择。写教程、做记录，短期看不出什么效果，但它逼着我把事情想清楚、讲明白，也让解决问题的能力一点点积累下来。",
+  "有问题、有不同意见，都欢迎在文章里批注，或者直接给我留言。很高兴在这里遇见你。",
 ];
 
 const recordCollections: Array<{ key: RecordCategoryKey; tone: Tone; label: string; title: string; intro: string }> = [
@@ -189,10 +198,31 @@ export function Studio({ content }: { content: SiteContent }) {
   const visibleTutorials = tutorials.filter((tutorial) => tutorialCategory === "全部" || tutorial.category === tutorialCategory);
   const selectedTutorial: PublishedTutorial | undefined = visibleTutorials.find((tutorial) => tutorial.id === selectedTutorialId) ?? visibleTutorials[0];
   const visibleArticles = articles.filter((article) => selectedColumn === "all" || article.column === selectedColumn);
-  const latest = useMemo(() => [
-    ...tutorials.map((item) => ({ type: "tutorial" as const, id: item.id, title: item.title, summary: item.summary, date: item.updatedAt || item.publishedAt, label: item.category })),
-    ...records.map((item) => ({ type: "record" as const, id: item.id, title: item.title, summary: item.summary || item.takeaway, date: item.date, label: collectionLabel(item.category) })),
-  ].sort((first, second) => second.date.localeCompare(first.date)).slice(0, 4), [tutorials, records]);
+  const latestTutorials = useMemo(() => [...tutorials].sort((first, second) => (second.updatedAt || second.publishedAt).localeCompare(first.updatedAt || first.publishedAt)).slice(0, 3), [tutorials]);
+  const latestRecords = records.slice(0, 3);
+  const [focusIndex, setFocusIndex] = useState(0);
+  const [activeAnchor, setActiveAnchor] = useState("top");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(() => setFocusIndex((index) => (index + 1) % focusWords.length), 2400);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  // 首页滚动时高亮当前所在的区块（内容 / 经历 / 联系）。
+  useEffect(() => {
+    if (activeWorkspace !== "home" || !("IntersectionObserver" in window)) return;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort((first, second) => first.boundingClientRect.top - second.boundingClientRect.top)[0];
+      if (visible) setActiveAnchor(HOME_ANCHORS[visible.target.id] ?? "top");
+    }, { rootMargin: "-35% 0px -55% 0px" });
+    Object.keys(HOME_ANCHORS).forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) observer.observe(element);
+    });
+    return () => observer.disconnect();
+  }, [activeWorkspace]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -246,17 +276,29 @@ export function Studio({ content }: { content: SiteContent }) {
     selectWorkspace(workspace, target);
   }
 
-  function openLatest(item: (typeof latest)[number]) {
-    if (item.type === "tutorial") {
-      setTutorialCategory("全部");
-      setSelectedTutorialId(item.id);
-      selectWorkspace("tutorials", "tutorial-reader");
-    } else {
-      setSelectedRecordCategory("all");
-      setSelectedRecordId(item.id);
-      selectWorkspace("records", "record-reader");
+  function openTutorial(id: string) {
+    setTutorialCategory("全部");
+    setSelectedTutorialId(id);
+    selectWorkspace("tutorials", "tutorial-reader");
+  }
+
+  function openRecord(id: string) {
+    setSelectedRecordCategory("all");
+    setSelectedRecordId(id);
+    selectWorkspace("records", "record-reader");
+  }
+
+  async function copyEmail() {
+    try {
+      await navigator.clipboard.writeText("otafukuchau@gmail.com");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      window.location.href = "mailto:otafukuchau@gmail.com";
     }
   }
+
+  const isNavActive = (item: (typeof navItems)[number]) => item.workspace === activeWorkspace && (activeWorkspace !== "home" || item.target === activeAnchor);
 
   function chooseRecordCategory(category: RecordCategoryKey | "all") {
     setSelectedRecordCategory(category);
@@ -357,12 +399,11 @@ export function Studio({ content }: { content: SiteContent }) {
         </Link>
         <button type="button" className="menu-toggle" aria-expanded={menuOpen} aria-controls="site-nav" onClick={() => setMenuOpen((open) => !open)}><span /><span /><em className="sr-only">菜单</em></button>
         <nav className="site-nav" id="site-nav" aria-label="主导航">
-          {workspaceTabs.map((tab) => (
-            <Link href={workspacePaths[tab.key]} className={activeWorkspace === tab.key ? "active" : ""} aria-current={activeWorkspace === tab.key ? "page" : undefined} key={tab.key} onClick={(event) => onNavLink(event, tab.key)}>
-              {tab.label}
+          {navItems.map((item) => (
+            <Link href={item.href} className={isNavActive(item) ? "active" : ""} aria-current={isNavActive(item) ? "page" : undefined} key={item.label} onClick={(event) => onNavLink(event, item.workspace, item.target)}>
+              {item.label}
             </Link>
           ))}
-          <Link href="/#contact" onClick={(event) => onNavLink(event, "home", "contact")}>联系</Link>
           <button type="button" className="account-button" onClick={() => { setMenuOpen(false); setAuthOpen(true); }}>{authUser ? "我的账户" : "登录"}</button>
         </nav>
       </header>
@@ -370,77 +411,105 @@ export function Studio({ content }: { content: SiteContent }) {
       {activeWorkspace === "home" && <>
         <section className="hero" id="top">
           <HeroArt />
+          <div className="hero-stickers" aria-hidden="true">{heroStickers.map((item, index) => <span className={`sticker sticker-${index + 1}`} key={item}>{item}</span>)}</div>
           <div className="hero-inner">
-            <p className="hero-kicker">周多福 / ZHOU DUOFU · 个人知识工作室</p>
-            <p className="hero-side">{profile.intro}</p>
-            <h1 className="hero-title split-lines"><span>把复杂问题</span><span>整理成</span><span className="hero-accent">能用的答案</span></h1>
+            <span className="hero-badge"><i aria-hidden="true" />{profile.role}</span>
+            <h1 className="hero-name">我是<span>周多福</span></h1>
+            <p className="hero-focus" aria-label={`专注 ${focusWords.join("、")}`}>
+              <span className="hero-focus-label">专注</span>
+              {focusWords.map((word, index) => <span className="hero-focus-item" key={word}><span className={index === focusIndex ? "focus-word active" : "focus-word"}>{word}</span>{index < focusWords.length - 1 && <b aria-hidden="true">+</b>}</span>)}
+            </p>
+            <p className="hero-motto">把复杂问题整理成能用的答案，保持独立判断，把方法留下来。</p>
             <div className="hero-actions">
-              <Link className="button button-primary" href="/tutorials" onClick={(event) => onNavLink(event, "tutorials")}>浏览实用教程<span aria-hidden="true">↗</span></Link>
-              <Link className="button button-ghost" href="/records" onClick={(event) => onNavLink(event, "records")}>读随心记录</Link>
+              <Link className="button button-primary" href="/#content" onClick={(event) => onNavLink(event, "home", "content")}>我的内容<span aria-hidden="true">→</span></Link>
+              <Link className="button button-ghost" href="/#journey" onClick={(event) => onNavLink(event, "home", "journey")}>我的经历<span aria-hidden="true">↓</span></Link>
+              <Link className="button button-ghost" href="/#contact" onClick={(event) => onNavLink(event, "home", "contact")}>和我聊聊<span aria-hidden="true">＋</span></Link>
             </div>
-            <div className="hero-foot">
-              <span>北京时间 <BeijingClock /></span>
-              <span>{tutorials.length} 篇教程 · {records.length} 篇记录</span>
-              <b>ZDF</b>
+            <div className="hero-cards">
+              <a className="hero-card tone-sky" href={contactMethods[0].href} target="_blank" rel="noreferrer"><small>小红书</small><strong>{contactMethods[0].value}</strong><em>打开主页 ↗</em></a>
+              <button type="button" className="hero-card tone-lilac" onClick={() => void copyEmail()}><small>邮箱</small><strong>{contactMethods[1].value}</strong><em>{copied ? "已复制 ✓" : "复制邮箱 ＋"}</em></button>
+              <div className="hero-card tone-mint"><small>北京时间</small><strong><BeijingClock /></strong><em>{tutorials.length} 篇教程 · {records.length} 篇记录</em></div>
             </div>
           </div>
         </section>
 
-        <section className="section split-section">
-          <div className="portrait-tile tone-sky" aria-hidden="true"><span className="card-frame" /><strong>周</strong><small>ZHOU DUOFU</small></div>
-          <div className="split-copy">
-            <p className="eyebrow">关于多福</p>
-            <h2>独立内容创作者，也是工具实践者。</h2>
-            <p>{profile.intro}</p>
-            <p>做过一线销售，也离开过不可持续的工作节奏。现在把经历整理成教程、记录和方法，让解决问题的能力慢慢积累。</p>
-            <ul className="promise-list">{profile.promise.map((item, index) => <li key={item}><span>{pad(index + 1)}</span>{item}</li>)}</ul>
-            <Link className="text-link" href="/about" onClick={(event) => onNavLink(event, "about")}>了解我的经历 →</Link>
-          </div>
-        </section>
+        <div className="ticker" aria-hidden="true">
+          <div className="ticker-track">{[0, 1].map((round) => <span key={round}>{tickerItems.map((item) => <span key={`${round}-${item}`}>{item}<i>✦</i></span>)}</span>)}</div>
+        </div>
 
-        <section className="section offer-section">
-          <div className="section-head">
-            <p className="eyebrow">这里有什么</p>
-            <h2>三类内容，回答不同的问题。</h2>
-            <p>教程给步骤，记录留判断，方法减少重复消耗。三类都可以单独阅读。</p>
-          </div>
-          <div className="offer-grid">
-            {offerings.map((item, index) => (
-              <Link className={`offer-card tone-${item.tone}`} href={workspacePaths[item.workspace]} key={item.key} onClick={(event) => onNavLink(event, item.workspace, item.target)}>
-                <div className="offer-visual"><span className="card-frame" /><span className="offer-index">{pad(index + 1)} /</span><span className="offer-orb" /></div>
-                <div className="offer-title"><h3>{item.label}</h3><span className="arrow" aria-hidden="true">↗</span></div>
-                <strong>{item.title}</strong>
+        <section className="section doing-section" id="doing">
+          <div className="section-head"><p className="eyebrow mono">What I do · 我在做的三件事</p><h2>教程给步骤，记录留判断，方法减少重复消耗。</h2></div>
+          <ol className="doing-list">
+            {doing.map((item, index) => (
+              <li key={item.en}>
+                <span className="mono doing-index">{pad(index + 1)}</span>
+                <span className="doing-name"><em className="hand">{item.en}</em><strong>{item.title}</strong></span>
                 <p>{item.copy}</p>
-                <small>你会得到 · {item.gets}</small>
-                <b>{item.cta} →</b>
-              </Link>
+                <Link className="doing-link" href={workspacePaths[item.workspace]} onClick={(event) => onNavLink(event, item.workspace, item.target)}>{item.cta}<span aria-hidden="true">→</span></Link>
+              </li>
             ))}
+          </ol>
+        </section>
+
+        <section className="section content-section" id="content">
+          <div className="section-head"><p className="eyebrow mono">Learn in public · 我的内容</p><h2>我的内容</h2><p>教程和记录，是我把学习与经历公开出来的两种方式。</p></div>
+          <div className="content-columns">
+            <div className="content-column tone-sky">
+              <div className="content-column-head"><span className="mono">01</span><div><h3>实用教程</h3><p>先亲自跑一遍，再写成能跟着做的步骤。</p></div></div>
+              <div className="content-cards">
+                {latestTutorials.map((item) => (
+                  <button type="button" className="content-card" key={item.id} onClick={() => openTutorial(item.id)}>
+                    <span className="pill">{item.category}</span>
+                    <strong>{item.title}</strong>
+                    <span className="content-card-foot"><span className="mono">{item.updatedAt || item.publishedAt}</span><span className="arrow" aria-hidden="true">↗</span></span>
+                  </button>
+                ))}
+              </div>
+              <Link className="text-link" href="/tutorials" onClick={(event) => onNavLink(event, "tutorials")}>查看全部 {tutorials.length} 篇教程 ↗</Link>
+            </div>
+            <div className="content-column tone-lilac">
+              <div className="content-column-head"><span className="mono">02</span><div><h3>随心记录</h3><p>有真实经历和新判断时才写，不为凑数。</p></div></div>
+              <div className="content-cards">
+                {latestRecords.map((item) => (
+                  <button type="button" className="content-card" key={item.id} onClick={() => openRecord(item.id)}>
+                    <span className="pill">{collectionLabel(item.category)}</span>
+                    <strong>{item.title}</strong>
+                    <span className="content-card-foot"><span className="mono">{item.date}</span><span className="arrow" aria-hidden="true">↗</span></span>
+                  </button>
+                ))}
+              </div>
+              <Link className="text-link" href="/records" onClick={(event) => onNavLink(event, "records")}>查看全部 {records.length} 篇记录 ↗</Link>
+            </div>
           </div>
         </section>
 
-        {latest.length > 0 && <section className="section latest-section">
-          <div className="section-head">
-            <p className="eyebrow">最近更新</p>
-            <h2>做过的事，学到的东西。</h2>
+        <section className="section journey-section" id="journey">
+          <div className="journey-intro">
+            <p className="eyebrow mono">Journey · 经历</p>
+            <h2>走到这里的路</h2>
+            <p>不是一条预先规划好的路线。每走一段，我都把当时解决问题的方法留了下来。</p>
+            <ul className="promise-list">{profile.promise.map((item, index) => <li key={item}><span className="mono">{pad(index + 1)}</span>{item}</li>)}</ul>
           </div>
-          <div className="entry-grid">
-            {latest.map((item, index) => (
-              <button type="button" className={`entry-card tone-${tones[index % 3]}`} key={`${item.type}-${item.id}`} onClick={() => openLatest(item)}>
-                <span className="entry-thumb"><span className="entry-index">{pad(index + 1)} /</span><span className="entry-type">{item.type === "tutorial" ? "教程" : "记录"}</span></span>
-                <span className="entry-meta">{item.label} · {item.date}</span>
-                <span className="entry-title">{item.title}</span>
-                <span className="entry-summary">{item.summary}</span>
-                <span className="arrow" aria-hidden="true">↗</span>
-              </button>
+          <ol className="timeline">
+            {journey.map((item) => (
+              <li className={item.current ? "is-current" : undefined} key={item.title}>
+                <span className="timeline-dot" aria-hidden="true" />
+                <span className="mono timeline-when">{item.when}</span>
+                <div className="timeline-body"><h3>{item.title}</h3><p>{item.copy}</p><div className="tag-row">{item.tags.map((tag) => <span key={tag}>{tag}</span>)}</div></div>
+              </li>
             ))}
-          </div>
-        </section>}
-
-        <section className="section principle-section">
-          <h2 className="principle-statement split-lines"><span>从真实问题出发，</span><span>让内容<em>用得上</em>、<em>接得住</em>。</span></h2>
-          <ol className="principle-list">
-            {principles.map((item) => <li key={item.index}><span>{item.index}</span><small>{item.key}</small><strong>{item.title}</strong><p>{item.note}</p></li>)}
           </ol>
+        </section>
+
+        <section className="section letter-section" id="letter">
+          <article className="letter">
+            <span className="card-frame" aria-hidden="true" />
+            <p className="mono letter-stamp">EST. 2026 · 致每一位访客</p>
+            <h2 className="hand">Dear Friend,</h2>
+            <p className="letter-greeting">亲爱的朋友：</p>
+            {letter.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+            <p className="letter-sign"><span className="hand">— 周多福</span><small className="mono">写于 2026</small></p>
+          </article>
         </section>
 
         {contactSection}
@@ -578,40 +647,11 @@ export function Studio({ content }: { content: SiteContent }) {
         </section>
       </>}
 
-      {activeWorkspace === "about" && <>
-        <PageHeader tone="mint" eyebrow="About · 关于" title={<><span>经历不是标签，</span><span>而是下一阶段的材料。</span></>} lead={profile.intro} meta={[profile.role]} />
-
-        <section className="section split-section">
-          <div className="portrait-tile tone-lilac" aria-hidden="true"><span className="card-frame" /><strong>周</strong><small>{profile.role}</small></div>
-          <div className="split-copy">
-            <p className="eyebrow">工作室原则</p>
-            <h2>把经验变成能复用的内容，把判断留给每一位读者。</h2>
-            <ul className="promise-list">{profile.promise.map((item, index) => <li key={item}><span>{pad(index + 1)}</span>{item}</li>)}</ul>
-            <p>长期方向：实用教程、随心记录与效率方法。内容尽量写清楚口径和来源，读完能直接用，也能自己核对。</p>
-          </div>
-        </section>
-
-        <section className="section path-section">
-          <div className="section-head"><p className="eyebrow">Personal path</p><h2>走到这里的三段路。</h2></div>
-          <ol className="path-list">
-            {careerPath.map((item, index) => <li className={`tone-${tones[index % 3]}`} key={item.index}><span className="card-frame" aria-hidden="true" /><span className="path-index">{item.index} /</span><strong>{item.title}</strong><p>{item.copy}</p></li>)}
-          </ol>
-        </section>
-
-        <section className="section principle-section">
-          <ol className="principle-list">
-            {principles.map((item) => <li key={item.index}><span>{item.index}</span><small>{item.key}</small><strong>{item.title}</strong><p>{item.note}</p></li>)}
-          </ol>
-        </section>
-
-        {contactSection}
-      </>}
-
       <footer className="site-footer">
         <div className="footer-mark" aria-hidden="true">周多福</div>
         <div className="footer-row">
           <div><strong>周多福个人工作室</strong><span>教程 · 记录 · 效率方法</span></div>
-          <nav aria-label="页脚导航">{workspaceTabs.map((tab) => <Link key={tab.key} href={workspacePaths[tab.key]} onClick={(event) => onNavLink(event, tab.key)}>{tab.label}</Link>)}</nav>
+          <nav aria-label="页脚导航">{navItems.map((item) => <Link key={item.label} href={item.href} onClick={(event) => onNavLink(event, item.workspace, item.target)}>{item.label}</Link>)}</nav>
           <p>累计访问 <strong>{visitCount === null ? "—" : new Intl.NumberFormat("zh-CN").format(visitCount)}</strong> 次 · 仅统计总次数，不记录访客身份</p>
         </div>
       </footer>

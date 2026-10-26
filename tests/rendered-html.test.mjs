@@ -33,13 +33,15 @@ test("server-renders the redesigned studio homepage", async () => {
 
   const html = await response.text();
   assert.match(html, /周多福/);
-  assert.match(html, /把复杂问题/);
-  assert.match(html, /能用的答案/);
-  assert.match(html, /三类内容，回答不同的问题/);
+  assert.match(html, /我是<span>周多福<\/span>/);
+  assert.match(html, /我在做的三件事/);
+  assert.match(html, /我的内容/);
+  assert.match(html, /走到这里的路/);
+  assert.match(html, /Dear Friend/);
   assert.match(html, /实用教程/);
   assert.match(html, /随心记录/);
-  assert.match(html, /效率方法/);
   assert.match(html, /留言与建议/);
+  for (const anchor of ["content", "journey", "contact"]) assert.match(html, new RegExp(`id="${anchor}"`));
   assert.doesNotMatch(html, /汽车数据与金融/);
   assert.doesNotMatch(html, /贷款/);
 });
@@ -48,7 +50,6 @@ test("server-renders each workspace as its own page", async () => {
   const pages = [
     ["/tutorials", /教程不是告诉你/, /实用教程 \| 周多福/],
     ["/records", /写成可以反复引用的判断/, /随心记录 \| 周多福/],
-    ["/about", /经历不是标签/, /关于 \| 周多福/],
   ];
   for (const [path, heading, title] of pages) {
     const response = await render(path);
@@ -71,11 +72,14 @@ test("removes the car finance workspace and calculator code", async () => {
 
 test("uses the light-blue three-tone design system and motion", async () => {
   const [styles, motion, hero] = await Promise.all([source("app/globals.css"), source("app/motion.ts"), source("app/hero-art.tsx")]);
+  assert.match(styles, /\.timeline/);
+  assert.match(styles, /\.ticker-track/);
+  assert.match(styles, /@keyframes marquee/);
   for (const token of ["--sky:", "--lilac:", "--mint:", "--sky-ink:", "--lilac-ink:", "--mint-ink:"]) assert.ok(styles.includes(token), token);
   assert.match(styles, /\.site-header\s*\{[\s\S]*?position:\s*fixed;/);
   assert.match(styles, /\.card-frame/);
-  assert.match(styles, /\.offer-card/);
-  assert.match(styles, /\.entry-card/);
+  assert.match(styles, /\.content-card/);
+  assert.match(styles, /\.letter/);
   assert.match(styles, /::view-transition-new\(root\)/);
   assert.match(styles, /prefers-reduced-motion/);
   assert.match(motion, /startViewTransition/);
