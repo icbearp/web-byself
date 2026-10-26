@@ -98,3 +98,18 @@ export const rateLimits = sqliteTable("rate_limits", {
   windowStart: integer("window_start").notNull(),
   lockedUntil: integer("locked_until").notNull().default(0),
 });
+
+export const siteSettings = sqliteTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+// 后台上传的小图片（头像、二维码），浏览器端压缩后以 base64 保存，经 /api/media/[id] 输出。
+export const media = sqliteTable("media", {
+  id: text("id").primaryKey(),
+  mime: text("mime").notNull(),
+  data: text("data").notNull(),
+  size: integer("size").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});

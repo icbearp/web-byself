@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { TutorialBody } from "../content-body";
+import { SettingsPanel } from "./settings-panel";
 import { recordCategoryOptions, type AdminEntry, type ContentSource, type EntryType } from "../content-types";
 
 type AuthUser = { id: string; email: string; role: string };
-type Section = "content" | "comments" | "feedback";
+type Section = "content" | "settings" | "comments" | "feedback";
 type EditorView = "split" | "write" | "preview";
 type Notice = { tone: "ok" | "error"; text: string } | null;
 type CommentItem = { id: string; contentType: string; contentId: string; contentTitle: string; category: string; message: string; authorName: string; anchorText: string; parentId: string | null; status: string; createdAt: string };
@@ -345,6 +346,7 @@ export function AdminConsole() {
         <Link className="cms-brand" href="/"><span className="cms-brand-mark">周</span><span>周多福<small>内容后台</small></span></Link>
         <nav className="cms-nav" aria-label="后台导航">
           <button type="button" className={section === "content" ? "is-active" : undefined} onClick={() => setSection("content")}><i>✎</i>内容<b>{entries.length}</b></button>
+          <button type="button" className={section === "settings" ? "is-active" : undefined} onClick={() => setSection("settings")}><i>⌂</i>主页设置</button>
           <button type="button" className={section === "comments" ? "is-active" : undefined} onClick={() => setSection("comments")}><i>❝</i>讨论审核{pendingComments > 0 && <b className="is-alert">{pendingComments}</b>}</button>
           <button type="button" className={section === "feedback" ? "is-active" : undefined} onClick={() => setSection("feedback")}><i>✉</i>留言建议<b>{feedback.length}</b></button>
         </nav>
@@ -470,6 +472,8 @@ export function AdminConsole() {
             </section>
           </div>
         )}
+
+        {section === "settings" && <SettingsPanel flash={flash} />}
 
         {section === "comments" && (
           <section className="cms-feed">

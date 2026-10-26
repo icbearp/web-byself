@@ -8,6 +8,7 @@ import type { PublishedRecord, PublishedTutorial, SiteContent } from "./content-
 import { ContentDiscussion, type AuthUser } from "./discussion";
 import { BeijingClock, HeroArt } from "./hero-art";
 import { useReveal, useWorkspaceTransition } from "./motion";
+import type { ContactItem, SiteSettings } from "./site-settings";
 
 type WorkspaceKey = "home" | "tutorials" | "records";
 type Tone = "sky" | "lilac" | "mint";
@@ -37,43 +38,16 @@ const navItems: Array<{ label: string; workspace: WorkspaceKey; target: string; 
 const HOME_ANCHORS: Record<string, string> = { top: "top", doing: "top", content: "content", journey: "journey", services: "services", letter: "contact", contact: "contact" };
 
 const profile = {
-  name: "周多福",
-  role: "2026 届毕业生 · 一人公司实践者",
   intro: "我把真实经历、个人判断和实用方法整理成一间长期更新的个人工作室。这里不代表任何品牌，内容尽量给出步骤、口径和来源，帮你自己完成判断。",
   promise: ["先去行动，再谈完美", "小步测试，及时止损", "把走过的路写下来"],
 };
-
-const contactMethods = [
-  { label: "小红书号", value: "191425657", href: "https://www.xiaohongshu.com/user/profile/191425657", external: true },
-  { label: "邮箱", value: "otafukuchau@gmail.com", href: "mailto:otafukuchau@gmail.com", external: false },
-  { label: "电话", value: "15993551315", href: "tel:15993551315", external: false },
-];
-
-const focusWords = ["AI 动效视频", "品牌创业", "自媒体", "Web3 研究"];
-
-const heroStickers = ["为自己，向未知出发", "BUILD IN PUBLIC", "一个人的公司", "KEEP SHIPPING"];
 
 const tickerItems = ["AI 动效视频", "熊奇 · BEAR UP", "自媒体矩阵", "会员代订阅", "网站搭建", "为自己，向未知出发", "BUILD IN PUBLIC"];
 
 const doing: Array<{ en: string; title: string; copy: string; cta: string; workspace: WorkspaceKey; target?: string }> = [
   { en: "create", title: "做视频", copy: "AI 主播口播加信息动效，一条流程稳定产出讲解视频，可以承接商务合作。", cta: "看合作", workspace: "home", target: "services" },
-  { en: "build", title: "做品牌", copy: "熊奇 / BEAR UP：公司注册、商标、货源、包装和官网，全部自己跑了一遍。", cta: "看经历", workspace: "home", target: "journey" },
+  { en: "build", title: "做品牌", copy: "熊奇 / BEAR UP：公司注册、商标、品牌、货源和包装，全部自己跑了一遍。", cta: "看经历", workspace: "home", target: "journey" },
   { en: "share", title: "做内容", copy: "AI、金融、Web3 与职场，在多个平台持续输出，也把方法写成教程和记录。", cta: "看内容", workspace: "home", target: "content" },
-];
-
-type JourneyStatus = "起点" | "已离开" | "持续迭代" | "已止损" | "进行中";
-
-// 成长之路：日期均来自项目文件的实际时间，后续有新进展直接在这里追加。
-const journey: Array<{ date: string; title: string; copy: string; tags: string[]; status: JourneyStatus }> = [
-  { date: "2025.12 起", title: "加密市场研究", copy: "还在学校时开始用 Python 写交易信号和评分脚本，前后迭代了 16 代；后来做成链上预测市场工作台，只做只读核验和纸面前向测试。它让我学会了用数据验证想法，也清楚它还只是个人测试，不能商用。", tags: ["Python", "回测与前向测试", "链上数据", "风险边界"], status: "持续迭代" },
-  { date: "2026.06", title: "大学毕业", copy: "赶上了很多人说的最难的求职季。同学们有的求稳，有的在努力上岸，我想试试另一条路。", tags: ["2026 届", "重新选择"], status: "起点" },
-  { date: "2026.07 — 08", title: "蔚来 · 乐道 销售顾问", copy: "两个月里接待用户、陪同试驾、跟进交付，也看清了这套体系和自己想要的成长并不一致，于是果断离开，准备做自己的事。", tags: ["一线销售", "用户沟通", "看清边界"], status: "已离开" },
-  { date: "2026.08 起", title: "开始做自媒体", copy: "借助 ChatGPT 和各种 AI 技能不断试错，在小红书、领英、公众号、币安广场和 X 运营账号，定位 AI、金融、Web3 和职场。", tags: ["小红书", "领英", "公众号", "币安广场", "X"], status: "进行中" },
-  { date: "2026.09", title: "注册公司，做出品牌", copy: "注册杭州熊奇电子商务有限公司，写完商业计划书和创业担保贷款方案，定下品牌“熊奇 / BEAR UP”和主张“为自己，向未知出发”，完成标志设计、商标初检和公司官网。", tags: ["公司注册", "商业计划书", "品牌战略", "商标", "官网"], status: "进行中" },
-  { date: "2026.09", title: "去景德镇做瓷器", copy: "跑到景德镇找货源，为万花杯等商品做透光写实的商品图，开起淘宝店。后来商家的货品和发货无法继续配合，运营又在持续烧钱，于是及时止损。", tags: ["景德镇", "淘宝店", "商品图", "供应链"], status: "已止损" },
-  { date: "2026.10", title: "BEARUP 袜子品牌", copy: "转向袜子：运动、商务、休闲三个系列的自有品牌。商标、货源、透明袋与抽拉盒包装、行动书签、给厂家的打样文件和 60 秒品牌故事片，都自己跑完。", tags: ["自有品牌", "包装设计", "打样", "品牌片"], status: "进行中" },
-  { date: "2026.10", title: "海外会员代订阅", copy: "搭了一个订阅商店，代订阅国外的 AI 会员服务：多种付款方式、订单查询、人工核款和自己的商家后台。", tags: ["订阅商店", "支付核款", "商家后台"], status: "进行中" },
-  { date: "现在进行时", title: "AI 动效视频跑通", copy: "摸索出一条稳定的生产流程：AI 主播口播、信息动效模组、剪映合成，可以按需求持续产出带动效的视频，开始承接商务合作。", tags: ["AI 主播", "动效模组", "剪映", "商务合作"], status: "进行中" },
 ];
 
 const services: Array<{ tone: Tone; tag: string; title: string; copy: string; fit: string; deliver: string; proof: string }> = [
@@ -169,7 +143,10 @@ function PageHeader({ tone, eyebrow, title, lead, meta }: { tone: Tone; eyebrow:
   );
 }
 
-export function Studio({ content }: { content: SiteContent }) {
+export function Studio({ content, settings }: { content: SiteContent; settings: SiteSettings }) {
+  const { home, contacts, journey } = settings;
+  const focusWords = home.focusWords;
+  const heroContacts = contacts.filter((item) => item.hero).slice(0, 2);
   const tutorials = content.tutorials;
   const changelog = content.changelog;
   const records = useMemo(() => [...content.records].sort((first, second) => second.date.localeCompare(first.date)), [content.records]);
@@ -228,13 +205,17 @@ export function Studio({ content }: { content: SiteContent }) {
   const latestRecords = records.slice(0, 3);
   const [focusIndex, setFocusIndex] = useState(0);
   const [activeAnchor, setActiveAnchor] = useState("top");
-  const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<ContactItem | null>(null);
+  const [cooperationTopic, setCooperationTopic] = useState<string | null>(null);
+  const [formPulse, setFormPulse] = useState(false);
+  const feedbackTextRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const timer = window.setInterval(() => setFocusIndex((index) => (index + 1) % focusWords.length), 2400);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [focusWords.length]);
 
   // 首页滚动时高亮当前所在的区块（内容 / 经历 / 联系）。
   useEffect(() => {
@@ -314,20 +295,32 @@ export function Studio({ content }: { content: SiteContent }) {
     selectWorkspace("records", "record-reader");
   }
 
-  async function copyEmail() {
+  async function copyValue(item: ContactItem) {
     try {
-      await navigator.clipboard.writeText("otafukuchau@gmail.com");
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
+      await navigator.clipboard.writeText(item.value);
+      setCopiedId(item.id);
+      window.setTimeout(() => setCopiedId((current) => (current === item.id ? null : current)), 1800);
     } catch {
-      window.location.href = "mailto:otafukuchau@gmail.com";
+      if (item.href) window.location.assign(item.href);
     }
   }
 
+  // 点击“聊这个合作”：表单切到商务合作、标明咨询的项目，滚到表单并把光标放进留言框。
   function startCooperation(title: string) {
     setFeedbackType("cooperation");
-    setFeedbackMessage(`我想了解「${title}」合作：`);
-    document.getElementById("contact")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setCooperationTopic(title);
+    setFeedbackMessage((current) => current.trim() && !current.startsWith("我想了解「") ? current : `我想了解「${title}」合作：`);
+    setFeedbackStatusText("");
+    document.getElementById("feedback-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFormPulse(false);
+    window.setTimeout(() => {
+      setFormPulse(true);
+      const textarea = feedbackTextRef.current;
+      if (textarea) {
+        textarea.focus({ preventScroll: true });
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      }
+    }, 650);
   }
 
   const isNavActive = (item: (typeof navItems)[number]) => item.workspace === activeWorkspace && (activeWorkspace !== "home" || item.target === activeAnchor);
@@ -387,6 +380,7 @@ export function Studio({ content }: { content: SiteContent }) {
       if (!response.ok) throw new Error(payload.error || "提交失败");
       setFeedbackMessage("");
       setFeedbackContact("");
+      setCooperationTopic(null);
       setFeedbackStatus("success");
       setFeedbackStatusText("已收到，谢谢你把具体想法告诉我。后续更新我会优先参考这些建议。");
     } catch (error) {
@@ -402,16 +396,23 @@ export function Studio({ content }: { content: SiteContent }) {
         <h2 className="split-lines"><span>有问题，</span><span>就从这里开始聊。</span></h2>
         <p>如果你有建议、遇到问题，或者希望我补充某个主题，可以直接留言。留言只进入我的私人收件箱，不会公开展示。</p>
         <div className="contact-methods">
-          {contactMethods.map((method) => <a className="contact-method" href={method.href} key={method.label} target={method.external ? "_blank" : undefined} rel={method.external ? "noreferrer" : undefined}><span>{method.label}</span><strong>{method.value}</strong><i aria-hidden="true">↗</i></a>)}
+          {contacts.map((item) => {
+            const external = /^https?:/i.test(item.href);
+            const body = <><span>{item.label}</span><strong>{item.value || "查看二维码"}</strong>{item.image ? <img className="contact-thumb" src={item.image} alt="" /> : <i aria-hidden="true">{item.href ? "↗" : "＋"}</i>}</>;
+            if (item.image) return <button type="button" className="contact-method" key={item.id} onClick={() => setLightbox(item)}>{body}</button>;
+            if (item.href) return <a className="contact-method" href={item.href} key={item.id} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}>{body}</a>;
+            return <button type="button" className="contact-method" key={item.id} onClick={() => void copyValue(item)}>{body}</button>;
+          })}
         </div>
       </div>
-      <form className="feedback-card" onSubmit={submitFeedback} aria-labelledby="feedback-heading">
+      <form className={`feedback-card ${formPulse ? "is-pulsing" : ""}`} id="feedback-form" onSubmit={submitFeedback} aria-labelledby="feedback-heading" onAnimationEnd={() => setFormPulse(false)}>
         <span className="card-frame" aria-hidden="true" />
         <p className="eyebrow">Feedback</p>
-        <h3 id="feedback-heading">留言与建议</h3>
+        <h3 id="feedback-heading">{feedbackType === "cooperation" ? "商务合作咨询" : "留言与建议"}</h3>
+        {feedbackType === "cooperation" && cooperationTopic && <p className="topic-chip"><span>正在咨询</span><strong>{cooperationTopic}</strong><button type="button" aria-label="取消合作主题" onClick={() => { setCooperationTopic(null); setFeedbackType("suggestion"); }}>×</button></p>}
         <p className="feedback-note">提交前请不要填写身份证号、银行卡号或其他不必要的敏感信息。</p>
-        <label className="field"><span>你想告诉我什么？</span><select value={feedbackType} onChange={(event) => setFeedbackType(event.target.value as FeedbackType)}><option value="suggestion">内容建议</option><option value="question">想问一个问题</option><option value="experience">使用体验</option><option value="cooperation">商务合作</option></select></label>
-        <label className="field"><span>留言内容</span><textarea required minLength={2} maxLength={2000} rows={5} value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} placeholder="例如：希望补充某个主题，或者哪里读起来不顺。" /></label>
+        <label className="field"><span>你想告诉我什么？</span><select value={feedbackType} onChange={(event) => { setFeedbackType(event.target.value as FeedbackType); if (event.target.value !== "cooperation") setCooperationTopic(null); }}><option value="suggestion">内容建议</option><option value="question">想问一个问题</option><option value="experience">使用体验</option><option value="cooperation">商务合作</option></select></label>
+        <label className="field"><span>留言内容</span><textarea ref={feedbackTextRef} required minLength={2} maxLength={2000} rows={5} value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} placeholder="例如：希望补充某个主题，或者哪里读起来不顺。" /></label>
         <label className="field"><span>联系方式（选填）</span><input type="text" maxLength={200} value={feedbackContact} onChange={(event) => setFeedbackContact(event.target.value)} placeholder="邮箱、微信号或手机号，方便我回复你" /></label>
         <label className="feedback-honeypot" aria-hidden="true">网站<input tabIndex={-1} autoComplete="off" value={feedbackWebsite} onChange={(event) => setFeedbackWebsite(event.target.value)} /></label>
         <button className="button button-primary" type="submit" disabled={feedbackStatus === "sending"}>{feedbackStatus === "sending" ? "正在提交…" : "提交留言"}<span aria-hidden="true">↗</span></button>
@@ -443,23 +444,28 @@ export function Studio({ content }: { content: SiteContent }) {
       {activeWorkspace === "home" && <>
         <section className="hero" id="top">
           <HeroArt />
-          <div className="hero-stickers" aria-hidden="true">{heroStickers.map((item, index) => <span className={`sticker sticker-${index + 1}`} key={item}>{item}</span>)}</div>
+          <div className="hero-stickers" aria-hidden="true">{home.stickers.map((item, index) => <span className={`sticker sticker-${index + 1}`} key={item}>{item}</span>)}</div>
           <div className="hero-inner">
-            <span className="hero-badge"><i aria-hidden="true" />{profile.role}</span>
-            <h1 className="hero-name">我是<span>周多福</span></h1>
+            {home.avatar && <img className="hero-avatar" src={home.avatar} alt={home.name} />}
+            <span className="hero-badge"><i aria-hidden="true" />{home.badge}</span>
+            <h1 className="hero-name">我是<span>{home.name}</span></h1>
             <p className="hero-focus" aria-label={`专注 ${focusWords.join("、")}`}>
               <span className="hero-focus-label">专注</span>
               {focusWords.map((word, index) => <span className="hero-focus-item" key={word}><span className={index === focusIndex ? "focus-word active" : "focus-word"}>{word}</span>{index < focusWords.length - 1 && <b aria-hidden="true">+</b>}</span>)}
             </p>
-            <p className="hero-motto">毕业这一年，我选择先去做：把想法变成产品，把经历写成方法。</p>
+            {home.motto && <p className="hero-motto">{home.motto}</p>}
             <div className="hero-actions">
               <Link className="button button-primary" href="/#content" onClick={(event) => onNavLink(event, "home", "content")}>我的内容<span aria-hidden="true">→</span></Link>
               <Link className="button button-ghost" href="/#journey" onClick={(event) => onNavLink(event, "home", "journey")}>我的经历<span aria-hidden="true">↓</span></Link>
               <Link className="button button-ghost" href="/#services" onClick={(event) => onNavLink(event, "home", "services")}>商务合作<span aria-hidden="true">＋</span></Link>
             </div>
             <div className="hero-cards">
-              <a className="hero-card tone-sky" href={contactMethods[0].href} target="_blank" rel="noreferrer"><small>小红书</small><strong>{contactMethods[0].value}</strong><em>打开主页 ↗</em></a>
-              <button type="button" className="hero-card tone-lilac" onClick={() => void copyEmail()}><small>邮箱</small><strong>{contactMethods[1].value}</strong><em>{copied ? "已复制 ✓" : "复制邮箱 ＋"}</em></button>
+              {heroContacts.map((item, index) => {
+                const tone = index === 0 ? "tone-sky" : "tone-lilac";
+                if (item.image) return <button type="button" className={`hero-card ${tone}`} key={item.id} onClick={() => setLightbox(item)}><small>{item.label}</small><strong>{item.value || "扫码联系"}</strong><em>查看二维码 ＋</em></button>;
+                if (/^https?:/i.test(item.href)) return <a className={`hero-card ${tone}`} key={item.id} href={item.href} target="_blank" rel="noreferrer"><small>{item.label}</small><strong>{item.value}</strong><em>打开主页 ↗</em></a>;
+                return <button type="button" className={`hero-card ${tone}`} key={item.id} onClick={() => void copyValue(item)}><small>{item.label}</small><strong>{item.value}</strong><em>{copiedId === item.id ? "已复制 ✓" : `复制${item.label} ＋`}</em></button>;
+              })}
               <div className="hero-card tone-mint"><small>北京时间</small><strong><BeijingClock /></strong><em>{tutorials.length} 篇教程 · {records.length} 篇记录</em></div>
             </div>
           </div>
@@ -567,7 +573,7 @@ export function Studio({ content }: { content: SiteContent }) {
             <h2 className="hand">Dear Friend,</h2>
             <p className="letter-greeting">亲爱的朋友：</p>
             {letter.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-            <p className="letter-sign"><span className="hand">— 周多福</span><small className="mono">写于 2026</small></p>
+            <p className="letter-sign"><span className="hand">— {home.name}</span><small className="mono">写于 2026</small></p>
           </article>
         </section>
 
@@ -707,13 +713,23 @@ export function Studio({ content }: { content: SiteContent }) {
       </>}
 
       <footer className="site-footer">
-        <div className="footer-mark" aria-hidden="true">周多福</div>
+        <div className="footer-mark" aria-hidden="true">{home.name}</div>
         <div className="footer-row">
           <div><strong>周多福个人工作室</strong><span>教程 · 记录 · 效率方法</span></div>
           <nav aria-label="页脚导航">{navItems.map((item) => <Link key={item.label} href={item.href} onClick={(event) => onNavLink(event, item.workspace, item.target)}>{item.label}</Link>)}</nav>
           <p>累计访问 <strong>{visitCount === null ? "—" : new Intl.NumberFormat("zh-CN").format(visitCount)}</strong> 次 · 仅统计总次数，不记录访客身份</p>
         </div>
       </footer>
+
+      {lightbox?.image && (
+        <div className="auth-backdrop" role="presentation" onMouseDown={() => setLightbox(null)}>
+          <figure className="lightbox" role="dialog" aria-modal="true" aria-label={lightbox.label} onMouseDown={(event) => event.stopPropagation()}>
+            <button className="auth-close" type="button" onClick={() => setLightbox(null)} aria-label="关闭">×</button>
+            <img src={lightbox.image} alt={lightbox.label} />
+            <figcaption><strong>{lightbox.label}</strong>{lightbox.value && <span>{lightbox.value}</span>}{lightbox.href && <a href={lightbox.href} target={/^https?:/i.test(lightbox.href) ? "_blank" : undefined} rel="noreferrer">打开链接 ↗</a>}</figcaption>
+          </figure>
+        </div>
+      )}
 
       {authOpen && (
         <div className="auth-backdrop" role="presentation" onMouseDown={() => setAuthOpen(false)}>
