@@ -40,8 +40,35 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    // 写操作只接受本站页面发起的请求，挡住其他网站借用登录状态伪造提交（CSRF）。
+    if (url.pathname.startsWith("/api/") && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+      const origin = request.headers.get("origin");
+      if (origin && origin !== url.origin) {
+        return Response.json({ error: "请求来源不被允许。" }, { status: 403 });
+      }
+    }
+
+    const response = await handler.fetch(request, env, ctx);
+    return withSecurityHeaders(response, url);
   },
 };
+
+const PRIVATE_PATHS = ["/admin", "/api/admin", "/api/auth"];
+
+function withSecurityHeaders(response: Response, url: URL) {
+  const secured = new Response(response.body, response);
+  const headers = secured.headers;
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  headers.set("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'");
+  if (url.protocol === "https:") headers.set("Strict-Transport-Security", "max-age=31536000");
+  if (PRIVATE_PATHS.some((path) => url.pathname === path || url.pathname.startsWith(`${path}/`))) {
+    headers.set("Cache-Control", "no-store");
+    headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
+  return secured;
+}
 
 export default worker;

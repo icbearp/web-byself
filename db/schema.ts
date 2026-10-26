@@ -91,3 +91,10 @@ export const changelog = sqliteTable("changelog", {
   detail: text("detail").notNull().default(""),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const rateLimits = sqliteTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  windowStart: integer("window_start").notNull(),
+  lockedUntil: integer("locked_until").notNull().default(0),
+});

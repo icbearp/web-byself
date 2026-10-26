@@ -1,6 +1,7 @@
 import { getDb } from "../../../db";
 import { feedback } from "../../../db/schema";
 import { getSessionUser } from "../_lib/auth";
+import { clientIp, lockedFor, postRules, recordHit, tooManyRequests } from "../_lib/rate-limit";
 
 const feedbackTypes = new Set(["suggestion", "question", "experience"]);
 
@@ -33,6 +34,10 @@ export async function POST(request: Request) {
     if (message.length > 2_000) return Response.json({ error: "留言请控制在 2000 字以内。" }, { status: 400 });
     if (contact.length > 200) return Response.json({ error: "联系方式过长，请检查后重试。" }, { status: 400 });
 
+    const rules = postRules("feedback", clientIp(request));
+    const wait = await lockedFor(rules);
+    if (wait > 0) return tooManyRequests(wait);
+    await recordHit(rules);
     const db = await getDb();
     const user = await getSessionUser(request);
     const [created] = await db.insert(feedback).values({ type, message, contact, page, userId: user?.id ?? null }).returning();

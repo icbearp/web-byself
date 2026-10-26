@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useReveal, useWorkspaceTransition } from "./motion";
 import { TutorialBody } from "./content-body";
 import type { SiteContent } from "./content-types";
 import { calculateAnnualizedIrr } from "./finance-math";
@@ -154,6 +157,13 @@ type SavedFinanceBill = {
   createdAt: string;
   snapshot: FinanceBillSnapshot;
 };
+
+export const workspacePaths: Record<WorkspaceKey, string> = { home: "/", life: "/tutorials", records: "/records", car: "/car" };
+
+function workspaceFromPath(pathname: string): WorkspaceKey {
+  const match = (Object.entries(workspacePaths) as Array<[WorkspaceKey, string]>).find(([key, path]) => key !== "home" && (pathname === path || pathname.startsWith(`${path}/`)));
+  return match?.[0] ?? "home";
+}
 
 const workspaceTabs: Array<{ key: WorkspaceKey; label: string; description: string }> = [
   { key: "home", label: "首页", description: "个人选择、长期内容与开放工具" },
@@ -866,7 +876,22 @@ export function Studio({ content }: { content: SiteContent }) {
   const dailyRecords = useMemo<DailyRecord[]>(() => [...(content.records as DailyRecord[]), ...builtInDailyRecords]
     .filter((record, index, all) => all.findIndex((item) => item.id === record.id) === index)
     .sort((first, second) => second.date.localeCompare(first.date)), [content.records]);
-  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("home");
+  const pathname = usePathname();
+  const router = useRouter();
+  const pushPath = useCallback((path: string) => router.push(path, { scroll: false }), [router]);
+  const activeWorkspace = workspaceFromPath(pathname ?? "/");
+  const navigateWithTransition = useWorkspaceTransition(pathname, pushPath);
+  useReveal();
+  const pendingScrollTarget = useRef<string | null>(null);
+
+  // 新页面真正渲染（路径变化）之后再滚到内容区，避免被路由的滚动复位覆盖。
+  useEffect(() => {
+    const target = pendingScrollTarget.current;
+    if (!target) return;
+    pendingScrollTarget.current = null;
+    const timer = window.setTimeout(() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
   const [homeView, setHomeView] = useState<HomeViewKey>("about");
   const [selectedRecordCategory, setSelectedRecordCategory] = useState<RecordCategoryKey | "all">("all");
   const [selectedStage, setSelectedStage] = useState<StageKey | "all">("all");
@@ -1249,18 +1274,23 @@ export function Studio({ content }: { content: SiteContent }) {
     if (nextRecord) setSelectedCarRecordId(nextRecord.id);
   }
 
-  function selectWorkspace(workspace: WorkspaceKey) {
-    setActiveWorkspace(workspace);
-    window.requestAnimationFrame(() => {
-      document.getElementById("workspace-content")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+  function selectWorkspace(workspace: WorkspaceKey, target = "workspace-content") {
+    if (workspace === activeWorkspace) {
+      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    pendingScrollTarget.current = target;
+    void navigateWithTransition(workspacePaths[workspace]);
   }
 
   function goToContact() {
-    setActiveWorkspace("home");
-    window.requestAnimationFrame(() => {
-      document.getElementById("contact")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    selectWorkspace("home", "contact");
+  }
+
+  function onNavLink(event: MouseEvent<HTMLAnchorElement>, workspace: WorkspaceKey) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    selectWorkspace(workspace);
   }
 
   async function loadRemoteBills() {
@@ -1383,15 +1413,15 @@ export function Studio({ content }: { content: SiteContent }) {
   return (
     <main>
       <header className="site-header" aria-label="主导航">
-        <button className="brand brand-button" type="button" onClick={() => selectWorkspace("home")} aria-label="周多福首页">
+        <Link className="brand brand-button" href="/" onClick={(event) => onNavLink(event, "home")} aria-label="周多福首页">
           <span className="brand-mark">周</span>
           <span><strong>周多福</strong><small>个人工作室 · 持续生长</small></span>
-        </button>
+        </Link>
         <nav className="workspace-nav" aria-label="内容工作区">
           {workspaceTabs.map((tab) => (
-            <button type="button" className={activeWorkspace === tab.key ? "active" : ""} key={tab.key} onClick={() => selectWorkspace(tab.key)}>
+            <Link href={workspacePaths[tab.key]} className={activeWorkspace === tab.key ? "active" : ""} aria-current={activeWorkspace === tab.key ? "page" : undefined} key={tab.key} onClick={(event) => onNavLink(event, tab.key)}>
               {tab.label}
-            </button>
+            </Link>
           ))}
           <button type="button" onClick={goToContact}>联系</button>
           <button type="button" className="account-nav-button" onClick={() => setAuthOpen(true)}>{authUser ? "我的账户" : "登录"}</button>

@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { comments } from "../../../db/schema";
 import { getSessionUser } from "../_lib/auth";
+import { clientIp, lockedFor, postRules, recordHit, tooManyRequests } from "../_lib/rate-limit";
 
 const contentTypes = new Set(["tutorial", "record", "article"]);
 const commentCategories = new Set(["question", "correction", "addition", "experience", "suggestion", "reply"]);
@@ -87,6 +88,12 @@ export async function POST(request: Request) {
 
     const db = await getDb();
     const user = await getSessionUser(request);
+    if (user?.role !== "admin") {
+      const rules = postRules("comment", clientIp(request));
+      const wait = await lockedFor(rules);
+      if (wait > 0) return tooManyRequests(wait);
+      await recordHit(rules);
+    }
     if (parentId) {
       const [parent] = await db.select({ id: comments.id }).from(comments)
         .where(and(eq(comments.id, parentId), eq(comments.contentType, contentType), eq(comments.contentId, contentId), eq(comments.status, "published")))

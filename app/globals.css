@@ -88,6 +88,13 @@ main {
   color: inherit;
   padding: 0;
   text-align: left;
+  text-decoration: none;
+}
+
+.workspace-nav a {
+  align-items: center;
+  display: inline-flex;
+  text-decoration: none;
 }
 
 .brand-mark {
@@ -131,7 +138,7 @@ nav {
   display: none;
 }
 
-.workspace-nav button {
+.workspace-nav :is(button, a) {
   background: transparent;
   border: 0;
   border-radius: 999px;
@@ -142,7 +149,7 @@ nav {
   white-space: nowrap;
 }
 
-.workspace-nav button.active {
+.workspace-nav :is(button, a).active {
   background: linear-gradient(135deg, #4859dc, #6f86f6);
   box-shadow: 0 8px 22px rgba(88, 104, 232, 0.24);
   color: #fff;
@@ -1935,7 +1942,7 @@ h3 {
     justify-content: flex-start;
   }
 
-  .workspace-nav button {
+  .workspace-nav :is(button, a) {
     font-size: 13px;
   }
 
@@ -3241,19 +3248,19 @@ body {
   padding: 4px;
 }
 
-.workspace-nav button {
+.workspace-nav :is(button, a) {
   border-radius: 9px;
   font-size: 13px;
   min-height: 34px;
   padding: 0 12px;
 }
 
-.workspace-nav button:hover {
+.workspace-nav :is(button, a):hover {
   background: rgba(255, 255, 255, 0.72);
   color: var(--ink);
 }
 
-.workspace-nav button.active {
+.workspace-nav :is(button, a).active {
   background: #fff;
   box-shadow: 0 3px 12px rgba(40, 57, 101, 0.1);
   color: #3f57d8;
@@ -3722,7 +3729,7 @@ body {
   .brand small { display: none; }
   .brand-mark { height: 36px; width: 36px; }
   .workspace-nav { border-radius: 11px; }
-  .workspace-nav button { font-size: 12px; padding: 0 9px; }
+  .workspace-nav :is(button, a) { font-size: 12px; padding: 0 9px; }
   .hero { padding-top: 50px; }
   .hero h1 { font-size: clamp(42px, 12vw, 62px); }
   .discussion-heading { align-items: start; padding: 20px; }
@@ -3736,6 +3743,163 @@ body {
   .admin-inline-reply { grid-template-columns: 1fr; }
 }
 
+/* ---------- Motion ---------- */
+:root {
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+}
+
+/* 顶部阅读进度条：只在支持滚动驱动动画的浏览器出现，不需要 JS。 */
+@supports (animation-timeline: scroll()) {
+  .site-header::after {
+    animation: scroll-progress linear both;
+    animation-timeline: scroll(root);
+    background: linear-gradient(90deg, #5a6bf0, #8fa2ff);
+    bottom: -1px;
+    content: "";
+    height: 2px;
+    left: 0;
+    position: absolute;
+    transform-origin: left;
+    width: 100%;
+  }
+}
+
+@keyframes scroll-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* 首屏入场 */
+.hero-copy > * {
+  animation: rise-in 820ms var(--ease-out) both;
+}
+
+.hero-copy > :nth-child(2) { animation-delay: 80ms; }
+.hero-copy > :nth-child(3) { animation-delay: 160ms; }
+.hero-copy > :nth-child(4) { animation-delay: 240ms; }
+.hero-copy > :nth-child(5) { animation-delay: 320ms; }
+
+.studio-orbit {
+  animation: fade-in 1s var(--ease-out) 200ms both;
+}
+
+.orbit-core {
+  animation: orbit-breathe 6s ease-in-out infinite;
+}
+
+.orbit-note,
+.studio-orbit .signal-card {
+  animation: pop-in 700ms var(--ease-out) both, float-y 7s ease-in-out infinite;
+}
+
+.orbit-note-one { animation-delay: 380ms, 1.1s; }
+.orbit-note-two { animation-delay: 480ms, 2.3s; }
+.orbit-note-three { animation-delay: 580ms, 3.4s; }
+.studio-orbit .signal-card { animation-delay: 680ms, 1.8s; }
+
+@keyframes rise-in {
+  from { opacity: 0; translate: 0 22px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; scale: .92; }
+  to { opacity: 1; scale: 1; }
+}
+
+@keyframes float-y {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -8px; }
+}
+
+@keyframes orbit-breathe {
+  0%, 100% { box-shadow: 0 24px 60px rgba(77, 97, 182, 0.18); }
+  50% { box-shadow: 0 28px 80px rgba(88, 104, 232, 0.3); }
+}
+
+/* 滚动显现：只有 JS 准备好（html.motion-ready）才先隐藏，避免无脚本时内容不可见。 */
+.motion-ready [data-reveal] {
+  opacity: 0;
+  translate: 0 28px;
+  transition: opacity 700ms var(--ease-out), translate 700ms var(--ease-out);
+}
+
+.motion-ready [data-reveal].is-revealed {
+  opacity: 1;
+  translate: 0 0;
+}
+
+.motion-ready [data-reveal] :is(.column-grid, .tutorial-list, .article-list, .efficiency-list, .brand-stat-grid, .journey-list, .record-date-list, .car-record-list, .home-view-grid, .ownership-summary-grid) > * {
+  opacity: 0;
+  translate: 0 16px;
+  transition: opacity 560ms var(--ease-out), translate 560ms var(--ease-out), box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.motion-ready [data-reveal].is-revealed :is(.column-grid, .tutorial-list, .article-list, .efficiency-list, .brand-stat-grid, .journey-list, .record-date-list, .car-record-list, .home-view-grid, .ownership-summary-grid) > * {
+  opacity: 1;
+  translate: 0 0;
+}
+
+.motion-ready [data-reveal].is-revealed :is(.column-grid, .tutorial-list, .article-list, .efficiency-list, .brand-stat-grid, .journey-list, .record-date-list, .car-record-list, .home-view-grid, .ownership-summary-grid) > :nth-child(2) { transition-delay: 60ms; }
+.motion-ready [data-reveal].is-revealed :is(.column-grid, .tutorial-list, .article-list, .efficiency-list, .brand-stat-grid, .journey-list, .record-date-list, .car-record-list, .home-view-grid, .ownership-summary-grid) > :nth-child(3) { transition-delay: 120ms; }
+.motion-ready [data-reveal].is-revealed :is(.column-grid, .tutorial-list, .article-list, .efficiency-list, .brand-stat-grid, .journey-list, .record-date-list, .car-record-list, .home-view-grid, .ownership-summary-grid) > :nth-child(4) { transition-delay: 180ms; }
+.motion-ready [data-reveal].is-revealed :is(.column-grid, .tutorial-list, .article-list, .efficiency-list, .brand-stat-grid, .journey-list, .record-date-list, .car-record-list, .home-view-grid, .ownership-summary-grid) > :nth-child(5) { transition-delay: 240ms; }
+.motion-ready [data-reveal].is-revealed :is(.column-grid, .tutorial-list, .article-list, .efficiency-list, .brand-stat-grid, .journey-list, .record-date-list, .car-record-list, .home-view-grid, .ownership-summary-grid) > :nth-child(n + 6) { transition-delay: 300ms; }
+
+/* 卡片与按钮的触感反馈 */
+.column-card,
+.primary-action,
+.secondary-action {
+  transition: transform 220ms var(--ease-out), box-shadow 220ms var(--ease-out), border-color 180ms ease, background 180ms ease;
+}
+
+.column-card:hover {
+  transform: translateY(-4px);
+}
+
+.primary-action:hover,
+.secondary-action:hover {
+  transform: translateY(-2px);
+}
+
+.primary-action:active,
+.secondary-action:active,
+.workspace-nav :is(button, a):active {
+  transform: scale(.97);
+}
+
+.workspace-nav :is(button, a) {
+  transition: background 200ms ease, color 200ms ease, box-shadow 200ms ease, transform 160ms ease;
+}
+
+/* 工作区切换：浏览器原生 View Transitions，导航栏保持不动，内容区淡出上移、淡入。 */
+.site-header {
+  view-transition-name: site-header;
+}
+
+::view-transition-old(root) {
+  animation: vt-out 220ms ease both;
+}
+
+::view-transition-new(root) {
+  animation: vt-in 420ms var(--ease-out) both;
+}
+
+@keyframes vt-out {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+@keyframes vt-in {
+  from { opacity: 0; transform: translateY(14px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .motion-ready [data-reveal], .motion-ready [data-reveal] * { opacity: 1 !important; translate: none !important; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
