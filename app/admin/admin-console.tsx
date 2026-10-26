@@ -27,7 +27,7 @@ type Draft = {
 
 const typeLabels: Record<EntryType, string> = { tutorial: "教程", record: "随心记录" };
 const commentStatusLabels: Record<string, string> = { pending: "待审核", published: "已公开", hidden: "已隐藏" };
-const feedbackTypeLabels: Record<string, string> = { suggestion: "建议", question: "提问", experience: "经验" };
+const feedbackTypeLabels: Record<string, string> = { suggestion: "建议", question: "提问", experience: "经验", cooperation: "商务合作" };
 const recordCategoryLabel = (key: string) => recordCategoryOptions.find((item) => item.key === key)?.label ?? key;
 
 function todayString() {

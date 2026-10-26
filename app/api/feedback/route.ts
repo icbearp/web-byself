@@ -3,7 +3,7 @@ import { feedback } from "../../../db/schema";
 import { getSessionUser } from "../_lib/auth";
 import { clientIp, lockedFor, postRules, recordHit, tooManyRequests } from "../_lib/rate-limit";
 
-const feedbackTypes = new Set(["suggestion", "question", "experience"]);
+const feedbackTypes = new Set(["suggestion", "question", "experience", "cooperation"]);
 
 function errorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unexpected error";

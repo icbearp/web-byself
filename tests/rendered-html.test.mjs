@@ -36,14 +36,16 @@ test("server-renders the redesigned studio homepage", async () => {
   assert.match(html, /我是<span>周多福<\/span>/);
   assert.match(html, /我在做的三件事/);
   assert.match(html, /我的内容/);
-  assert.match(html, /走到这里的路/);
+  assert.match(html, /我的成长之路/);
+  assert.match(html, /可以一起做的事/);
+  assert.match(html, /AI 动效视频定制/);
   assert.match(html, /Dear Friend/);
   assert.match(html, /实用教程/);
   assert.match(html, /随心记录/);
   assert.match(html, /留言与建议/);
-  for (const anchor of ["content", "journey", "contact"]) assert.match(html, new RegExp(`id="${anchor}"`));
+  for (const anchor of ["content", "journey", "services", "contact"]) assert.match(html, new RegExp(`id="${anchor}"`));
   assert.doesNotMatch(html, /汽车数据与金融/);
-  assert.doesNotMatch(html, /贷款/);
+  assert.doesNotMatch(html, /贷款金融|月供|购车/);
 });
 
 test("server-renders each workspace as its own page", async () => {

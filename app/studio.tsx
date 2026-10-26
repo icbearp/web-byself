@@ -13,7 +13,7 @@ type WorkspaceKey = "home" | "tutorials" | "records";
 type Tone = "sky" | "lilac" | "mint";
 type ColumnKey = "tools" | "efficiency" | "information" | "life";
 type RecordCategoryKey = "career-growth" | "life-efficiency" | "side-project";
-type FeedbackType = "suggestion" | "question" | "experience";
+type FeedbackType = "suggestion" | "question" | "experience" | "cooperation";
 
 export const workspacePaths: Record<WorkspaceKey, string> = { home: "/", tutorials: "/tutorials", records: "/records" };
 
@@ -29,17 +29,18 @@ const navItems: Array<{ label: string; workspace: WorkspaceKey; target: string; 
   { label: "经历", workspace: "home", target: "journey", href: "/#journey" },
   { label: "教程", workspace: "tutorials", target: "top", href: "/tutorials" },
   { label: "记录", workspace: "records", target: "top", href: "/records" },
+  { label: "合作", workspace: "home", target: "services", href: "/#services" },
   { label: "联系", workspace: "home", target: "contact", href: "/#contact" },
 ];
 
-// 首页各区块对应的导航项：三件事算“首页”，致访客的信算“经历”。
-const HOME_ANCHORS: Record<string, string> = { top: "top", doing: "top", content: "content", journey: "journey", letter: "journey", contact: "contact" };
+// 首页各区块对应的导航项：三件事算“首页”，致访客的信算“联系”。
+const HOME_ANCHORS: Record<string, string> = { top: "top", doing: "top", content: "content", journey: "journey", services: "services", letter: "contact", contact: "contact" };
 
 const profile = {
   name: "周多福",
-  role: "独立内容创作者 / 工具实践者",
+  role: "2026 届毕业生 · 一人公司实践者",
   intro: "我把真实经历、个人判断和实用方法整理成一间长期更新的个人工作室。这里不代表任何品牌，内容尽量给出步骤、口径和来源，帮你自己完成判断。",
-  promise: ["保持独立判断", "尊重工作与生活的边界", "把能复用的方法留下来"],
+  promise: ["先去行动，再谈完美", "小步测试，及时止损", "把走过的路写下来"],
 };
 
 const contactMethods = [
@@ -48,28 +49,53 @@ const contactMethods = [
   { label: "电话", value: "15993551315", href: "tel:15993551315", external: false },
 ];
 
-const focusWords = ["职场选择", "效率方法", "信息判断", "个人成长"];
+const focusWords = ["AI 动效视频", "品牌创业", "自媒体", "Web3 研究"];
 
-const heroStickers = ["保持独立判断", "LONG TERM", "把方法留下来", "KEEP LEARNING"];
+const heroStickers = ["为自己，向未知出发", "BUILD IN PUBLIC", "一个人的公司", "KEEP SHIPPING"];
 
-const tickerItems = ["实用教程", "随心记录", "效率方法", "保持独立判断", "把复杂问题讲清楚", "LEARN IN PUBLIC", "把方法留下来"];
+const tickerItems = ["AI 动效视频", "熊奇 · BEAR UP", "自媒体矩阵", "会员代订阅", "网站搭建", "为自己，向未知出发", "BUILD IN PUBLIC"];
 
 const doing: Array<{ en: string; title: string; copy: string; cta: string; workspace: WorkspaceKey; target?: string }> = [
-  { en: "write", title: "写教程", copy: "把一个问题从头做到尾，留下步骤、适用边界和可以核对的来源。", cta: "看教程", workspace: "tutorials" },
-  { en: "record", title: "记判断", copy: "职场选择、生活效率和业余实践。不追求日更，有真实经历才写。", cta: "读记录", workspace: "records" },
-  { en: "refine", title: "磨方法", copy: "沟通、阅读、复盘里真正用过的方法，拆成可以直接套用的清单。", cta: "看方法", workspace: "tutorials", target: "efficiency" },
+  { en: "create", title: "做视频", copy: "AI 主播口播加信息动效，一条流程稳定产出讲解视频，可以承接商务合作。", cta: "看合作", workspace: "home", target: "services" },
+  { en: "build", title: "做品牌", copy: "熊奇 / BEAR UP：公司注册、商标、货源、包装和官网，全部自己跑了一遍。", cta: "看经历", workspace: "home", target: "journey" },
+  { en: "share", title: "做内容", copy: "AI、金融、Web3 与职场，在多个平台持续输出，也把方法写成教程和记录。", cta: "看内容", workspace: "home", target: "content" },
 ];
 
-const journey: Array<{ when: string; title: string; copy: string; tags: string[]; current?: boolean }> = [
-  { when: "过去", title: "一线销售", copy: "在真实用户、价格与服务之间，积累沟通、需求梳理和决策支持的经验。", tags: ["沟通表达", "需求梳理", "决策支持", "客户服务"] },
-  { when: "转折", title: "重新选择边界", copy: "离开长期不可持续的工作节奏，重新审视健康、权益与个人发展的关系。", tags: ["健康优先", "劳动权益", "长期主义"] },
-  { when: "现在进行时", title: "个人知识工作室", copy: "把经历整理为教程、方法和有来源的记录，让解决问题的能力持续积累。", tags: ["实用教程", "随心记录", "效率方法", "网站搭建"], current: true },
+type JourneyStatus = "起点" | "已离开" | "持续迭代" | "已止损" | "进行中";
+
+// 成长之路：日期均来自项目文件的实际时间，后续有新进展直接在这里追加。
+const journey: Array<{ date: string; title: string; copy: string; tags: string[]; status: JourneyStatus }> = [
+  { date: "2025.12 起", title: "加密市场研究", copy: "还在学校时开始用 Python 写交易信号和评分脚本，前后迭代了 16 代；后来做成链上预测市场工作台，只做只读核验和纸面前向测试。它让我学会了用数据验证想法，也清楚它还只是个人测试，不能商用。", tags: ["Python", "回测与前向测试", "链上数据", "风险边界"], status: "持续迭代" },
+  { date: "2026.06", title: "大学毕业", copy: "赶上了很多人说的最难的求职季。同学们有的求稳，有的在努力上岸，我想试试另一条路。", tags: ["2026 届", "重新选择"], status: "起点" },
+  { date: "2026.07 — 08", title: "蔚来 · 乐道 销售顾问", copy: "两个月里接待用户、陪同试驾、跟进交付，也看清了这套体系和自己想要的成长并不一致，于是果断离开，准备做自己的事。", tags: ["一线销售", "用户沟通", "看清边界"], status: "已离开" },
+  { date: "2026.08 起", title: "开始做自媒体", copy: "借助 ChatGPT 和各种 AI 技能不断试错，在小红书、领英、公众号、币安广场和 X 运营账号，定位 AI、金融、Web3 和职场。", tags: ["小红书", "领英", "公众号", "币安广场", "X"], status: "进行中" },
+  { date: "2026.09", title: "注册公司，做出品牌", copy: "注册杭州熊奇电子商务有限公司，写完商业计划书和创业担保贷款方案，定下品牌“熊奇 / BEAR UP”和主张“为自己，向未知出发”，完成标志设计、商标初检和公司官网。", tags: ["公司注册", "商业计划书", "品牌战略", "商标", "官网"], status: "进行中" },
+  { date: "2026.09", title: "去景德镇做瓷器", copy: "跑到景德镇找货源，为万花杯等商品做透光写实的商品图，开起淘宝店。后来商家的货品和发货无法继续配合，运营又在持续烧钱，于是及时止损。", tags: ["景德镇", "淘宝店", "商品图", "供应链"], status: "已止损" },
+  { date: "2026.10", title: "BEARUP 袜子品牌", copy: "转向袜子：运动、商务、休闲三个系列的自有品牌。商标、货源、透明袋与抽拉盒包装、行动书签、给厂家的打样文件和 60 秒品牌故事片，都自己跑完。", tags: ["自有品牌", "包装设计", "打样", "品牌片"], status: "进行中" },
+  { date: "2026.10", title: "海外会员代订阅", copy: "搭了一个订阅商店，代订阅国外的 AI 会员服务：多种付款方式、订单查询、人工核款和自己的商家后台。", tags: ["订阅商店", "支付核款", "商家后台"], status: "进行中" },
+  { date: "现在进行时", title: "AI 动效视频跑通", copy: "摸索出一条稳定的生产流程：AI 主播口播、信息动效模组、剪映合成，可以按需求持续产出带动效的视频，开始承接商务合作。", tags: ["AI 主播", "动效模组", "剪映", "商务合作"], status: "进行中" },
+];
+
+const services: Array<{ tone: Tone; tag: string; title: string; copy: string; fit: string; deliver: string; proof: string }> = [
+  { tone: "sky", tag: "已跑通", title: "AI 动效视频定制", copy: "AI 主播口播 + 信息动效 + 剪辑合成，适合产品讲解、知识科普和品牌短片。", fit: "需要持续产出讲解类视频的品牌、机构与个人", deliver: "分镜脚本、竖屏 / 横屏成片、可复用的动效模组", proof: "75 秒产品讲解样片与 5 段动效模组（自制样片）" },
+  { tone: "lilac", tag: "亲身走完", title: "品牌从 0 到 1", copy: "公司注册、商业计划书、品牌战略、标志与商标初检、包装和打样，我自己的品牌全部走过一遍。", fit: "准备创业的大学生、想做自有品牌的小商家", deliver: "品牌定位与故事、视觉与包装方案、打样说明", proof: "熊奇 / BEARUP 战略路线图、商业计划书、三系列包装" },
+  { tone: "mint", tag: "可上线", title: "网站与工具搭建", copy: "个人主页、品牌官网、订阅商店和内容后台，从设计到上线，带后台和安全加固。", fit: "需要一个能长期维护网站的个人与小团队", deliver: "可在线编辑的网站、部署与使用说明", proof: "本站、熊奇公司官网、会员订阅商店" },
+  { tone: "sky", tag: "多平台", title: "内容与自媒体合作", copy: "在小红书、领英、公众号、币安广场和 X 输出 AI、金融、Web3 与职场内容。", fit: "AI 工具、金融科技、Web3 项目与职场类品牌", deliver: "测评、教程、联合内容与多平台分发", proof: "五个平台账号持续运营" },
+  { tone: "lilac", tag: "在营业", title: "海外会员代订阅", copy: "代订阅国外 AI 会员服务，多种付款方式，订单可查询，人工核款。", fit: "需要海外 AI 工具但付款不便的个人与团队", deliver: "订阅开通与订单查询", proof: "自建订阅商店与商家后台" },
+  { tone: "mint", tag: "自有品牌", title: "BEARUP 袜子团购与定制", copy: "运动、商务、休闲三个系列，可做团购、企业礼品和渠道合作。", fit: "企业礼品、运动社团、渠道与店铺", deliver: "现货供应、组合礼盒与包装定制", proof: "商标、货源与包装打样均已完成" },
+];
+
+const cooperationSteps = [
+  { title: "沟通需求", copy: "说清目标、预算和时间" },
+  { title: "方案与报价", copy: "给出范围、交付物和价格" },
+  { title: "样片 / 打样", copy: "先做小样，确认方向" },
+  { title: "交付与复盘", copy: "按约交付，一起看效果" },
 ];
 
 const letter = [
-  "这个网站是我给自己留的一块长期园地：记录经历、整理方法，也存放那些值得反复回看的判断。如果其中某一篇刚好帮你少走一点弯路，那就是它最好的用处。",
-  "我相信普通人的复利来自好好选择。写教程、做记录，短期看不出什么效果，但它逼着我把事情想清楚、讲明白，也让解决问题的能力一点点积累下来。",
-  "有问题、有不同意见，都欢迎在文章里批注，或者直接给我留言。很高兴在这里遇见你。",
+  "今年六月，我从大学毕业，赶上了很多人说的最难的一年。在蔚来乐道做了两个月顾问之后，我发现那条路和我想要的成长并不一致，于是选择离开，开始做自己的事。",
+  "这几个月我试了很多：研究加密市场、运营自媒体、注册公司、去景德镇找瓷器、做自己的袜子品牌、搭订阅商店，也跑通了 AI 动效视频。有的成了，有的及时止损了，但每一步都让我更清楚自己能做什么。",
+  "身边的同学有的安稳，有的在努力，我只是想试试另一种可能：为自己，向未知出发。如果你也在路上，或者有可以一起做的事，欢迎来聊。",
 ];
 
 const recordCollections: Array<{ key: RecordCategoryKey; tone: Tone; label: string; title: string; intro: string }> = [
@@ -298,6 +324,12 @@ export function Studio({ content }: { content: SiteContent }) {
     }
   }
 
+  function startCooperation(title: string) {
+    setFeedbackType("cooperation");
+    setFeedbackMessage(`我想了解「${title}」合作：`);
+    document.getElementById("contact")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   const isNavActive = (item: (typeof navItems)[number]) => item.workspace === activeWorkspace && (activeWorkspace !== "home" || item.target === activeAnchor);
 
   function chooseRecordCategory(category: RecordCategoryKey | "all") {
@@ -378,7 +410,7 @@ export function Studio({ content }: { content: SiteContent }) {
         <p className="eyebrow">Feedback</p>
         <h3 id="feedback-heading">留言与建议</h3>
         <p className="feedback-note">提交前请不要填写身份证号、银行卡号或其他不必要的敏感信息。</p>
-        <label className="field"><span>你想告诉我什么？</span><select value={feedbackType} onChange={(event) => setFeedbackType(event.target.value as FeedbackType)}><option value="suggestion">内容建议</option><option value="question">想问一个问题</option><option value="experience">使用体验</option></select></label>
+        <label className="field"><span>你想告诉我什么？</span><select value={feedbackType} onChange={(event) => setFeedbackType(event.target.value as FeedbackType)}><option value="suggestion">内容建议</option><option value="question">想问一个问题</option><option value="experience">使用体验</option><option value="cooperation">商务合作</option></select></label>
         <label className="field"><span>留言内容</span><textarea required minLength={2} maxLength={2000} rows={5} value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} placeholder="例如：希望补充某个主题，或者哪里读起来不顺。" /></label>
         <label className="field"><span>联系方式（选填）</span><input type="text" maxLength={200} value={feedbackContact} onChange={(event) => setFeedbackContact(event.target.value)} placeholder="邮箱、微信号或手机号，方便我回复你" /></label>
         <label className="feedback-honeypot" aria-hidden="true">网站<input tabIndex={-1} autoComplete="off" value={feedbackWebsite} onChange={(event) => setFeedbackWebsite(event.target.value)} /></label>
@@ -419,11 +451,11 @@ export function Studio({ content }: { content: SiteContent }) {
               <span className="hero-focus-label">专注</span>
               {focusWords.map((word, index) => <span className="hero-focus-item" key={word}><span className={index === focusIndex ? "focus-word active" : "focus-word"}>{word}</span>{index < focusWords.length - 1 && <b aria-hidden="true">+</b>}</span>)}
             </p>
-            <p className="hero-motto">把复杂问题整理成能用的答案，保持独立判断，把方法留下来。</p>
+            <p className="hero-motto">毕业这一年，我选择先去做：把想法变成产品，把经历写成方法。</p>
             <div className="hero-actions">
               <Link className="button button-primary" href="/#content" onClick={(event) => onNavLink(event, "home", "content")}>我的内容<span aria-hidden="true">→</span></Link>
               <Link className="button button-ghost" href="/#journey" onClick={(event) => onNavLink(event, "home", "journey")}>我的经历<span aria-hidden="true">↓</span></Link>
-              <Link className="button button-ghost" href="/#contact" onClick={(event) => onNavLink(event, "home", "contact")}>和我聊聊<span aria-hidden="true">＋</span></Link>
+              <Link className="button button-ghost" href="/#services" onClick={(event) => onNavLink(event, "home", "services")}>商务合作<span aria-hidden="true">＋</span></Link>
             </div>
             <div className="hero-cards">
               <a className="hero-card tone-sky" href={contactMethods[0].href} target="_blank" rel="noreferrer"><small>小红书</small><strong>{contactMethods[0].value}</strong><em>打开主页 ↗</em></a>
@@ -438,7 +470,7 @@ export function Studio({ content }: { content: SiteContent }) {
         </div>
 
         <section className="section doing-section" id="doing">
-          <div className="section-head"><p className="eyebrow mono">What I do · 我在做的三件事</p><h2>教程给步骤，记录留判断，方法减少重复消耗。</h2></div>
+          <div className="section-head"><p className="eyebrow mono">What I do · 我在做的三件事</p><h2>做视频，做品牌，做内容。</h2></div>
           <ol className="doing-list">
             {doing.map((item, index) => (
               <li key={item.en}>
@@ -485,19 +517,46 @@ export function Studio({ content }: { content: SiteContent }) {
 
         <section className="section journey-section" id="journey">
           <div className="journey-intro">
-            <p className="eyebrow mono">Journey · 经历</p>
-            <h2>走到这里的路</h2>
-            <p>不是一条预先规划好的路线。每走一段，我都把当时解决问题的方法留了下来。</p>
+            <p className="eyebrow mono">Journey · 成长之路</p>
+            <h2>我的成长之路</h2>
+            <p>2026 年 6 月毕业，赶上最难的求职季。同学们有的求稳，有的在努力上岸；我选了另一条路：先去做，边做边学。</p>
             <ul className="promise-list">{profile.promise.map((item, index) => <li key={item}><span className="mono">{pad(index + 1)}</span>{item}</li>)}</ul>
           </div>
           <ol className="timeline">
             {journey.map((item) => (
-              <li className={item.current ? "is-current" : undefined} key={item.title}>
+              <li className={item.status === "进行中" ? "is-current" : item.status === "已止损" || item.status === "已离开" ? "is-past" : undefined} key={`${item.date}-${item.title}`}>
                 <span className="timeline-dot" aria-hidden="true" />
-                <span className="mono timeline-when">{item.when}</span>
+                <span className="timeline-when"><span className="mono">{item.date}</span><em className={`status status-${item.status}`}>{item.status}</em></span>
                 <div className="timeline-body"><h3>{item.title}</h3><p>{item.copy}</p><div className="tag-row">{item.tags.map((tag) => <span key={tag}>{tag}</span>)}</div></div>
               </li>
             ))}
+          </ol>
+        </section>
+
+        <section className="section services-section" id="services">
+          <div className="section-head">
+            <p className="eyebrow mono">Work with me · 商务合作</p>
+            <h2>可以一起做的事</h2>
+            <p>下面每一项都是我自己跑过、正在做的事。价格按需求和交付范围报价，先聊清楚再开始。</p>
+          </div>
+          <div className="service-grid">
+            {services.map((item, index) => (
+              <article className={`service-card tone-${item.tone}`} key={item.title}>
+                <span className="card-frame" aria-hidden="true" />
+                <div className="service-head"><span className="mono">{pad(index + 1)}</span><span className="pill">{item.tag}</span></div>
+                <h3>{item.title}</h3>
+                <p>{item.copy}</p>
+                <dl>
+                  <div><dt>适合</dt><dd>{item.fit}</dd></div>
+                  <div><dt>交付</dt><dd>{item.deliver}</dd></div>
+                  <div><dt>依据</dt><dd>{item.proof}</dd></div>
+                </dl>
+                <button type="button" className="service-cta" onClick={() => startCooperation(item.title)}>聊这个合作<span aria-hidden="true">→</span></button>
+              </article>
+            ))}
+          </div>
+          <ol className="process-list" aria-label="合作流程">
+            {cooperationSteps.map((step, index) => <li key={step.title}><span className="mono">{pad(index + 1)}</span><strong>{step.title}</strong><small>{step.copy}</small></li>)}
           </ol>
         </section>
 

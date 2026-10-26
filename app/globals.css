@@ -1120,6 +1120,7 @@ div.hero-card {
   grid-row: 1;
 }
 
+
 .timeline-body {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1153,6 +1154,199 @@ div.hero-card {
 
 .timeline li:first-child .tag-row span { background: var(--sky); color: #2a6aad; }
 .timeline li.is-current .tag-row span { background: var(--mint); color: #1f6e53; }
+
+.timeline-when {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status {
+  border-radius: 999px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  padding: 2px 9px;
+}
+
+.status-进行中 { background: var(--mint); color: #1f6e53; }
+.status-持续迭代 { background: var(--sky); color: #2a6aad; }
+.status-起点 { background: var(--lilac); color: #5a4fb8; }
+.status-已离开,
+.status-已止损 { background: #eef0f4; color: var(--muted); }
+
+.timeline li.is-past .timeline-dot {
+  border-color: var(--line-strong);
+}
+
+.timeline li.is-past .timeline-body {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- 商务合作 ---------- */
+.service-grid {
+  display: grid;
+  gap: clamp(14px, 2vw, 22px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.service-card {
+  background: linear-gradient(170deg, var(--tone) 0%, rgba(255, 255, 255, 0.75) 70%);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px 26px 24px;
+  position: relative;
+  transition: transform 360ms var(--ease), box-shadow 360ms ease;
+}
+
+.service-card .card-frame {
+  border-radius: 10px;
+  inset: 10px;
+  opacity: 0;
+  transition: inset 420ms var(--ease), opacity 300ms ease;
+}
+
+.service-card:hover {
+  box-shadow: 0 22px 48px rgba(15, 27, 45, 0.1);
+  transform: translateY(-4px);
+}
+
+.service-card:hover .card-frame {
+  inset: 6px;
+  opacity: 1;
+}
+
+.service-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.service-head .mono {
+  color: var(--tone-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.service-head .pill {
+  background: #fff;
+}
+
+.service-card h3 {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.service-card > p {
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.service-card dl {
+  border-top: 1px solid rgba(15, 27, 45, 0.08);
+  display: grid;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.service-card dl div {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 36px 1fr;
+}
+
+.service-card dt {
+  color: var(--tone-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.service-card dd {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.service-cta {
+  align-items: center;
+  align-self: flex-start;
+  background: var(--ink);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 9px 16px;
+  position: relative;
+  transition: transform 220ms var(--ease), background 220ms ease;
+}
+
+.service-cta span {
+  transition: transform 300ms var(--ease);
+}
+
+.service-cta:hover {
+  background: #1b2c47;
+}
+
+.service-cta:hover span {
+  transform: translateX(4px);
+}
+
+.process-list {
+  border-top: 1px solid var(--line-strong);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: clamp(28px, 4vw, 48px);
+}
+
+.process-list li {
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
+  padding: 18px 18px 4px;
+  position: relative;
+}
+
+.process-list li:first-child {
+  border-left: 0;
+}
+
+.process-list li::after {
+  color: var(--line-strong);
+  content: "→";
+  position: absolute;
+  right: -8px;
+  top: 18px;
+}
+
+.process-list li:last-child::after {
+  display: none;
+}
+
+.process-list .mono {
+  color: var(--lilac-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.process-list strong {
+  font-size: 17px;
+}
+
+.process-list small {
+  color: var(--muted);
+  font-size: 13px;
+}
 
 /* ---------- 致访客的信 ---------- */
 .letter {
@@ -2520,23 +2714,23 @@ div.hero-card {
   translate: 0 0;
 }
 
-.motion-ready [data-reveal] :is(.doing-list, .content-cards, .timeline, .collection-grid, .promise-list, .content-columns) > *,
+.motion-ready [data-reveal] :is(.doing-list, .content-cards, .timeline, .collection-grid, .promise-list, .content-columns, .service-grid, .process-list) > *,
 .motion-ready [data-reveal] .split-lines > span {
   opacity: 0;
   transition: opacity 700ms var(--ease), translate 700ms var(--ease), background 300ms ease, transform 300ms var(--ease);
   translate: 0 24px;
 }
 
-.motion-ready [data-reveal].is-revealed :is(.doing-list, .content-cards, .timeline, .collection-grid, .promise-list, .content-columns) > *,
+.motion-ready [data-reveal].is-revealed :is(.doing-list, .content-cards, .timeline, .collection-grid, .promise-list, .content-columns, .service-grid, .process-list) > *,
 .motion-ready [data-reveal].is-revealed .split-lines > span {
   opacity: 1;
   translate: 0 0;
 }
 
-.motion-ready [data-reveal].is-revealed :is(.doing-list, .content-cards, .timeline, .collection-grid, .promise-list, .content-columns) > :nth-child(2),
+.motion-ready [data-reveal].is-revealed :is(.doing-list, .content-cards, .timeline, .collection-grid, .promise-list, .content-columns, .service-grid, .process-list) > :nth-child(2),
 .motion-ready [data-reveal].is-revealed .split-lines > span:nth-child(2) { transition-delay: 90ms; }
-.motion-ready [data-reveal].is-revealed :is(.doing-list, .content-cards, .timeline, .collection-grid, .promise-list, .content-columns) > :nth-child(3) { transition-delay: 180ms; }
-.motion-ready [data-reveal].is-revealed :is(.doing-list, .content-cards, .timeline, .collection-grid, .promise-list, .content-columns) > :nth-child(n + 4) { transition-delay: 270ms; }
+.motion-ready [data-reveal].is-revealed :is(.doing-list, .content-cards, .timeline, .collection-grid, .promise-list, .content-columns, .service-grid, .process-list) > :nth-child(3) { transition-delay: 180ms; }
+.motion-ready [data-reveal].is-revealed :is(.doing-list, .content-cards, .timeline, .collection-grid, .promise-list, .content-columns, .service-grid, .process-list) > :nth-child(n + 4) { transition-delay: 270ms; }
 
 /* 页面切换：浏览器原生 View Transitions，导航栏保持不动。 */
 ::view-transition-old(root) {
@@ -2609,6 +2803,11 @@ div.hero-card {
   .doing-link { grid-column: 2; }
   .doing-link { justify-self: start; }
 
+  .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .process-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .process-list li:nth-child(3) { border-left: 0; }
+  .process-list li:nth-child(2)::after { display: none; }
+
   .content-columns,
   .journey-section,
   .contact-section,
@@ -2625,7 +2824,8 @@ div.hero-card {
   .hero-stickers { display: none; }
   .hero-focus { font-size: 21px; }
   .hero-actions .button { flex: 1 1 auto; }
-  .collection-grid { grid-template-columns: 1fr; }
+  .collection-grid,
+  .service-grid { grid-template-columns: 1fr; }
   .comment-form-grid { grid-template-columns: 1fr; }
   .contact-method { grid-template-columns: 72px 1fr auto; }
   .changelog article { grid-template-columns: 1fr; }
