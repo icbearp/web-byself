@@ -11,7 +11,7 @@
     "build": "node scripts/build-vinext.mjs",
     "build:pages": "node scripts/build-vinext.mjs && node scripts/prepare-cloudflare-pages.mjs",
     "start": "vinext start",
-    "test": "pnpm run build && node --test tests/rendered-html.test.mjs tests/finance-math.test.mjs",
+    "test": "pnpm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "tutorial:editor": "node tools/tutorial-publisher/server.mjs"

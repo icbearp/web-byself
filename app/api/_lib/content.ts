@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { changelog, entries } from "../../../db/schema";
-import { recordCategoryOptions, stageOptions, type AdminEntry, type ContentSource, type EntryType, type SiteContent } from "../../content-types";
+import { recordCategoryOptions, type AdminEntry, type ContentSource, type EntryType, type SiteContent } from "../../content-types";
 import tutorialsData from "../../../content/tutorials.json";
 import recordsData from "../../../content/records.json";
 import changelogData from "../../../content/changelog.json";
@@ -9,7 +9,6 @@ import changelogData from "../../../content/changelog.json";
 type EntryRow = typeof entries.$inferSelect;
 
 const recordCategories = new Set<string>(recordCategoryOptions.map((item) => item.key));
-const stages = new Set<string>(stageOptions.map((item) => item.key));
 
 function parseList<T>(value: string, fallback: T[] = []): T[] {
   try {
@@ -72,9 +71,8 @@ export function normalizeEntryInput(input: Record<string, unknown>) {
 
   if (type === "record") {
     const category = recordCategories.has(String(input.category)) ? String(input.category) : "life-efficiency";
-    const stage = category === "car-info" && stages.has(String(input.stage)) ? String(input.stage) : null;
     return {
-      type, id, title, summary, content, date, category, stage,
+      type, id, title, summary, content, date, category, stage: null,
       tags: JSON.stringify(tags),
       sources: JSON.stringify(sources),
       takeaway: (String(input.takeaway ?? "").trim() || summary || "这条记录仍在继续整理。").slice(0, 500),

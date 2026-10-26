@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { TutorialBody } from "../content-body";
-import { recordCategoryOptions, stageOptions, type AdminEntry, type ContentSource, type EntryType } from "../content-types";
+import { recordCategoryOptions, type AdminEntry, type ContentSource, type EntryType } from "../content-types";
 
 type AuthUser = { id: string; email: string; role: string };
 type Section = "content" | "comments" | "feedback";
@@ -18,7 +18,6 @@ type Draft = {
   title: string;
   summary: string;
   category: string;
-  stage: string;
   tags: string;
   content: string;
   takeaway: string;
@@ -36,7 +35,7 @@ function todayString() {
 }
 
 function blankDraft(type: EntryType): Draft {
-  return { type, id: "", title: "", summary: "", category: type === "record" ? "life-efficiency" : "", stage: "", tags: "", content: "", takeaway: "", sources: [], date: todayString() };
+  return { type, id: "", title: "", summary: "", category: type === "record" ? "life-efficiency" : "", tags: "", content: "", takeaway: "", sources: [], date: todayString() };
 }
 
 function draftFromEntry(entry: AdminEntry): Draft {
@@ -46,7 +45,6 @@ function draftFromEntry(entry: AdminEntry): Draft {
     title: entry.title,
     summary: entry.summary,
     category: entry.category,
-    stage: entry.stage ?? "",
     tags: entry.tags.join("，"),
     content: entry.content,
     takeaway: entry.takeaway,
@@ -432,9 +430,6 @@ export function AdminConsole() {
                         <label><span>分类</span><input list="cms-tutorial-categories" value={draft.category} onChange={(event) => updateDraft({ category: event.target.value })} placeholder="例如：信息判断" maxLength={30} /><datalist id="cms-tutorial-categories">{tutorialCategories.map((item) => <option key={item} value={item} />)}</datalist></label>
                       ) : (
                         <label><span>分类</span><select value={draft.category} onChange={(event) => updateDraft({ category: event.target.value })}>{recordCategoryOptions.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
-                      )}
-                      {draft.type === "record" && draft.category === "car-info" && (
-                        <label><span>买车阶段</span><select value={draft.stage} onChange={(event) => updateDraft({ stage: event.target.value })}><option value="">未指定</option>{stageOptions.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
                       )}
                       <label className="is-wide"><span>标签（用逗号分隔）</span><input value={draft.tags} onChange={(event) => updateDraft({ tags: event.target.value })} placeholder="效率，工具" /></label>
                       {draft.type === "record" && <label className="is-wide"><span>一句话结论</span><input value={draft.takeaway} onChange={(event) => updateDraft({ takeaway: event.target.value })} placeholder="留空则使用摘要" maxLength={500} /></label>}

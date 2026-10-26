@@ -50,13 +50,7 @@ export function useWorkspaceTransition(pathname: string | null, push: (path: str
 
 const REVEAL_SELECTOR = [
   "main > .section",
-  "main > section.intro-band",
-  "main > section.contact-section",
-  ".profile-section",
-  ".career-path",
-  ".ownership-section",
-  ".upfront-section",
-  ".library-panel",
+  "main > .contact-section",
 ].join(", ");
 
 /** 滚动进入视口时淡入；新渲染出来的内容（切换工作区、筛选）会自动加入观察。 */

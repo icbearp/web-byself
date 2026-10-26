@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase,
     title: "周多福 | 个人工作室",
     description:
-      "周多福的个人知识与工具网站：实用教程、来源整理、随心记录、汽车数据与开放金融计算。",
+      "周多福的个人知识工作室：实用教程、随心记录与效率方法，每篇保留步骤与来源。",
     icons: {
       icon: "/favicon.svg",
       shortcut: "/favicon.svg",
@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: "summary",
       title: "周多福 | 个人工作室",
       description:
-        "实用教程、来源整理、真实记录与开放工具。",
+        "实用教程、随心记录与效率方法。",
     },
   };
 }
