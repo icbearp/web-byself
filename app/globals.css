@@ -2713,6 +2713,25 @@ h3 {
   justify-content: space-between;
 }
 
+.admin-inbox-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-inbox-actions a {
+  align-items: center;
+  border: 1px solid var(--ink);
+  border-radius: 7px;
+  color: var(--ink);
+  display: inline-flex;
+  font-weight: 800;
+  min-height: 46px;
+  padding: 0 16px;
+  text-decoration: none;
+}
+
 .admin-inbox-head h3 {
   font-size: clamp(27px, 4vw, 38px);
   margin: 4px 0 6px;

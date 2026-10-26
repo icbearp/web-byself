@@ -7,10 +7,10 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
+    "dev": "vinext dev",
     "build": "node scripts/build-vinext.mjs",
     "build:pages": "node scripts/build-vinext.mjs && node scripts/prepare-cloudflare-pages.mjs",
-    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "start": "vinext start",
     "test": "pnpm run build && node --test tests/rendered-html.test.mjs tests/finance-math.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",

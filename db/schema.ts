@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const feedback = sqliteTable("feedback", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -62,3 +62,32 @@ export const comments = sqliteTable("comments", {
   index("idx_comments_content_status_created").on(table.contentType, table.contentId, table.status, table.createdAt),
   index("idx_comments_parent_id").on(table.parentId),
 ]);
+
+export const entries = sqliteTable("entries", {
+  type: text("type").notNull(),
+  id: text("id").notNull(),
+  title: text("title").notNull(),
+  summary: text("summary").notNull().default(""),
+  category: text("category").notNull().default(""),
+  stage: text("stage"),
+  tags: text("tags").notNull().default("[]"),
+  content: text("content").notNull().default(""),
+  takeaway: text("takeaway").notNull().default(""),
+  sources: text("sources").notNull().default("[]"),
+  date: text("date").notNull().default(""),
+  status: text("status").notNull().default("draft"),
+  publishedAt: text("published_at"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  primaryKey({ columns: [table.type, table.id] }),
+  index("idx_entries_type_status_date").on(table.type, table.status, table.date),
+]);
+
+export const changelog = sqliteTable("changelog", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  date: text("date").notNull(),
+  title: text("title").notNull(),
+  detail: text("detail").notNull().default(""),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});

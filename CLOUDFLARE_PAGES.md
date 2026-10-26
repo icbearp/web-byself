@@ -39,7 +39,7 @@ git push origin main
 2. 进入 Workers & Pages → 选择 Pages 项目 → Settings → Bindings → Add → D1 database bindings。
 3. 变量名填写 `DB`，选择刚创建的数据库，并分别配置 Production 与 Preview。
 4. 进入 Settings → Variables and Secrets，添加普通文本变量 `ADMIN_EMAIL`，值填写你的管理员登录邮箱。Production 与 Preview 建议分别配置。
-5. 使用 `drizzle/0000_bright_menace.sql` 和后续迁移文件，按照文件编号从小到大在目标 D1 数据库执行迁移。
+5. 使用 `drizzle/0000_bright_menace.sql` 和后续迁移文件，按照文件编号从小到大在目标 D1 数据库执行迁移。其中 `0004_content_entries.sql` 和 `0005_seed_content.sql` 用于在线内容后台，详见 `TUTORIAL_PUBLISHER.md`。
 6. 重新部署 Pages 项目。
 7. 使用 `ADMIN_EMAIL` 对应的邮箱注册。必须先配置变量再注册，该账户才会被标记为管理员并看到私有收件箱。
 

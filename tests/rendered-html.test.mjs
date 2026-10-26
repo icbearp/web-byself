@@ -53,7 +53,7 @@ test("keeps generated lifestyle imagery local to the site", async () => {
 
 test("keeps the primary navigation fixed and the buyer journey interactive", async () => {
   const [pageSource, styles, records] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/studio.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../content/records.json", import.meta.url), "utf8"),
   ]);
@@ -71,7 +71,7 @@ test("keeps the primary navigation fixed and the buyer journey interactive", asy
 });
 
 test("separates loan finance, first payment, and ownership-cost inputs", async () => {
-  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const pageSource = await readFile(new URL("../app/studio.tsx", import.meta.url), "utf8");
 
   assert.match(pageSource, />贷款金融</);
   assert.match(pageSource, />税费、保险与首次付款</);
@@ -93,7 +93,7 @@ test("separates loan finance, first payment, and ownership-cost inputs", async (
 
 test("includes maintainable tutorials, records, drafts, visit statistics, and the local publisher", async () => {
   const [pageSource, visitSource, publisherSource, publisherHtml, tutorials, records] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/studio.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/stats/visits/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../tools/tutorial-publisher/server.mjs", import.meta.url), "utf8"),
     readFile(new URL("../tools/tutorial-publisher/index.html", import.meta.url), "utf8"),
@@ -115,7 +115,7 @@ test("includes maintainable tutorials, records, drafts, visit statistics, and th
 
 test("supports anchored article discussions, moderation, and editorial interaction styling", async () => {
   const [pageSource, styles, schema, commentsRoute, adminCommentsRoute, migration] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/studio.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/comments/route.ts", import.meta.url), "utf8"),
@@ -140,7 +140,7 @@ test("supports anchored article discussions, moderation, and editorial interacti
 
 test("supports guided accounts, cloud bills, and a private admin inbox", async () => {
   const [pageSource, authSource, billSource, adminSource] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/studio.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/_lib/auth.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/bills/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/admin/bills/route.ts", import.meta.url), "utf8"),
