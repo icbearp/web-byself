@@ -50,9 +50,12 @@ export const defaultSettings: SiteSettings = {
     stickers: ["为自己，向未知出发", "BUILD IN PUBLIC", "从 0 到 1", "KEEP SHIPPING"],
     avatar: null,
   },
+  // 二维码图片存在数据库里，默认值只保留文字链接；实际内容以后台“联系方式”为准。
   contacts: [
-    { id: "xiaohongshu", label: "小红书", value: "191425657", href: "https://www.xiaohongshu.com/user/profile/191425657", image: null, hero: true },
+    { id: "xiaohongshu", label: "小红书", value: "191425657", href: "https://xhslink.cn/o/HRPUJWPjPg", image: null, hero: true },
     { id: "email", label: "邮箱", value: "otafukuchau@gmail.com", href: "mailto:otafukuchau@gmail.com", image: null, hero: true },
+    { id: "x", label: "X", value: "@Otafuku1315", href: "https://x.com/Otafuku1315", image: null, hero: false },
+    { id: "linkedin", label: "领英", value: "junxuuchow", href: "https://www.linkedin.com/in/junxuuchow", image: null, hero: false },
     { id: "phone", label: "电话", value: "15993551315", href: "tel:15993551315", image: null, hero: false },
   ],
   journey: [
