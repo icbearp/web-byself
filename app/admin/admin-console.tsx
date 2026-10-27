@@ -4,14 +4,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { TutorialBody } from "../content-body";
 import { SettingsPanel } from "./settings-panel";
+import { InboxPanel, type FeedbackItem } from "./inbox-panel";
+import { UsersPanel } from "./users-panel";
 import { recordCategoryOptions, type AdminEntry, type ContentSource, type EntryType } from "../content-types";
 
 type AuthUser = { id: string; email: string; role: string };
-type Section = "content" | "settings" | "comments" | "feedback";
+type Section = "content" | "settings" | "comments" | "feedback" | "users";
 type EditorView = "split" | "write" | "preview";
 type Notice = { tone: "ok" | "error"; text: string } | null;
 type CommentItem = { id: string; contentType: string; contentId: string; contentTitle: string; category: string; message: string; authorName: string; anchorText: string; parentId: string | null; status: string; createdAt: string };
-type FeedbackItem = { id: number; type: string; message: string; contact: string; page: string; createdAt: string; userEmail?: string | null };
 
 type Draft = {
   type: EntryType;
@@ -28,7 +29,6 @@ type Draft = {
 
 const typeLabels: Record<EntryType, string> = { tutorial: "教程", record: "随心记录" };
 const commentStatusLabels: Record<string, string> = { pending: "待审核", published: "已公开", hidden: "已隐藏" };
-const feedbackTypeLabels: Record<string, string> = { suggestion: "建议", question: "提问", experience: "经验", cooperation: "商务合作" };
 const recordCategoryLabel = (key: string) => recordCategoryOptions.find((item) => item.key === key)?.label ?? key;
 
 function todayString() {
@@ -139,7 +139,7 @@ export function AdminConsole() {
     } catch (error) {
       flash("error", error instanceof Error ? error.message : "留言读取失败。");
     }
-  }, [flash]);
+  }, [flash, setFeedback]);
 
   const signIn = useCallback((next: AuthUser | null) => {
     setUser(next);
@@ -170,6 +170,7 @@ export function AdminConsole() {
 
   const tutorialCategories = useMemo(() => Array.from(new Set(entries.filter((entry) => entry.type === "tutorial").map((entry) => entry.category))).filter(Boolean), [entries]);
   const pendingComments = comments.filter((item) => item.status === "pending").length;
+  const openFeedback = feedback.filter((item) => item.status === "new").length;
   const counts = useMemo(() => ({
     published: entries.filter((entry) => entry.status === "published").length,
     draft: entries.filter((entry) => entry.status === "draft").length,
@@ -348,7 +349,8 @@ export function AdminConsole() {
           <button type="button" className={section === "content" ? "is-active" : undefined} onClick={() => setSection("content")}><i>✎</i>内容<b>{entries.length}</b></button>
           <button type="button" className={section === "settings" ? "is-active" : undefined} onClick={() => setSection("settings")}><i>⌂</i>主页设置</button>
           <button type="button" className={section === "comments" ? "is-active" : undefined} onClick={() => setSection("comments")}><i>❝</i>讨论审核{pendingComments > 0 && <b className="is-alert">{pendingComments}</b>}</button>
-          <button type="button" className={section === "feedback" ? "is-active" : undefined} onClick={() => setSection("feedback")}><i>✉</i>留言建议<b>{feedback.length}</b></button>
+          <button type="button" className={section === "feedback" ? "is-active" : undefined} onClick={() => setSection("feedback")}><i>✉</i>留言建议{openFeedback > 0 && <b className="is-alert">{openFeedback}</b>}</button>
+          <button type="button" className={section === "users" ? "is-active" : undefined} onClick={() => setSection("users")}><i>☺</i>用户与账户</button>
         </nav>
         <div className="cms-side-foot">
           <a href="/" target="_blank" rel="noreferrer">查看网站 ↗</a>
@@ -508,24 +510,9 @@ export function AdminConsole() {
           </section>
         )}
 
-        {section === "feedback" && (
-          <section className="cms-feed">
-            <header className="cms-pane-head">
-              <div><h1>留言建议</h1><p>读者通过网站“留言与建议”提交的内容，只有你能看到。</p></div>
-              <button type="button" className="cms-button is-ghost" onClick={() => void loadFeedback()}>刷新</button>
-            </header>
-            <div className="cms-cards">
-              {feedback.map((item, index) => (
-                <article className="cms-card" key={item.id} style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}>
-                  <div className="cms-card-head"><em className="cms-pill">{feedbackTypeLabels[item.type] ?? item.type}</em><strong>{item.page}</strong><time>{item.createdAt}</time></div>
-                  <p>{item.message}</p>
-                  <small>{[item.contact, item.userEmail].filter(Boolean).join(" · ") || "未留联系方式"}</small>
-                </article>
-              ))}
-              {feedback.length === 0 && <p className="cms-empty">目前还没有留言。</p>}
-            </div>
-          </section>
-        )}
+        {section === "feedback" && <InboxPanel items={feedback} setItems={setFeedback} reload={() => void loadFeedback()} flash={flash} />}
+
+        {section === "users" && <UsersPanel me={{ id: user.id, email: user.email }} flash={flash} />}
       </main>
     </div>
   );

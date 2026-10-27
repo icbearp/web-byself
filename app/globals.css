@@ -2691,6 +2691,32 @@ button.contact-method {
   gap: 8px;
 }
 
+.account-security {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.account-security summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.account-security .auth-form {
+  margin-top: 12px;
+}
+
+.account-logout-all {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  margin-top: 14px;
+  padding: 0 0 2px;
+}
+
 /* ---------- 页脚 ---------- */
 .site-footer {
   border-top: 1px solid var(--line-strong);

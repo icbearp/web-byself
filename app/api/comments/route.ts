@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { comments } from "../../../db/schema";
 import { getSessionUser } from "../_lib/auth";
+import { notifyOwner } from "../_lib/notify";
 import { clientIp, lockedFor, postRules, recordHit, tooManyRequests } from "../_lib/rate-limit";
 
 const contentTypes = new Set(["tutorial", "record", "article"]);
@@ -119,6 +120,9 @@ export async function POST(request: Request) {
       userId: user?.id ?? null,
       status,
     }).returning();
+    if (status !== "published") {
+      await notifyOwner([`💬 新的文章讨论待审核 · ${contentTitle}`, "", anchorText ? `引用：「${anchorText.slice(0, 160)}」` : null, message.slice(0, 800), "", `昵称：${authorName}`]);
+    }
     return Response.json({ ok: true, comment: created, reviewRequired: status !== "published" }, { status: 201 });
   } catch (error) {
     return databaseError(error);

@@ -1,6 +1,7 @@
 import { getDb } from "../../../db";
 import { feedback } from "../../../db/schema";
 import { getSessionUser } from "../_lib/auth";
+import { feedbackTypeLabels, notifyOwner } from "../_lib/notify";
 import { clientIp, lockedFor, postRules, recordHit, tooManyRequests } from "../_lib/rate-limit";
 
 const feedbackTypes = new Set(["suggestion", "question", "experience", "cooperation"]);
@@ -41,6 +42,15 @@ export async function POST(request: Request) {
     const db = await getDb();
     const user = await getSessionUser(request);
     const [created] = await db.insert(feedback).values({ type, message, contact, page, userId: user?.id ?? null }).returning();
+    await notifyOwner([
+      type === "cooperation" ? "🤝 新的商务合作咨询" : `✉️ 新留言 · ${feedbackTypeLabels[type] ?? type}`,
+      "",
+      message.slice(0, 1200),
+      "",
+      contact ? `联系方式：${contact}` : "联系方式：未填写",
+      user ? `注册用户：${user.email}` : null,
+      `来自页面：${page}`,
+    ]);
     return Response.json({ ok: true, feedback: created }, { status: 201 });
   } catch (error) {
     return errorResponse(error);

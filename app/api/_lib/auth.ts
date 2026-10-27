@@ -1,4 +1,4 @@
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, ne } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { sessions, users } from "../../../db/schema";
 
@@ -62,9 +62,26 @@ export async function getSessionUser(request: Request) {
     .select({ id: users.id, email: users.email, role: users.role })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, Math.floor(Date.now() / 1000))))
+    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, Math.floor(Date.now() / 1000)), eq(users.disabled, 0)))
     .limit(1);
   return row ?? null;
+}
+
+/** 当前请求所用登录凭证的哈希；用于“退出其他设备”时保留本机。 */
+export async function currentTokenHash(request: Request) {
+  const token = cookieValue(request);
+  return token ? hashText(token) : "";
+}
+
+/** 让某个用户在所有设备下线；传入 keepTokenHash 时保留那一个会话。 */
+export async function deleteUserSessions(userId: string, keepTokenHash = "") {
+  const db = await getDb();
+  await db.delete(sessions).where(keepTokenHash ? and(eq(sessions.userId, userId), ne(sessions.tokenHash, keepTokenHash)) : eq(sessions.userId, userId));
+}
+
+export async function requireAdmin(request: Request) {
+  const user = await getSessionUser(request);
+  return user?.role === "admin" ? user : null;
 }
 
 export async function createSession(userId: string) {

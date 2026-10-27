@@ -8,8 +8,10 @@ export const feedback = sqliteTable("feedback", {
   contact: text("contact").notNull().default(""),
   page: text("page").notNull().default("home"),
   status: text("status").notNull().default("new"),
+  note: text("note").notNull().default(""),
   userId: text("user_id"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at"),
 });
 
 export const users = sqliteTable("users", {
@@ -18,6 +20,7 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   passwordSalt: text("password_salt").notNull(),
   role: text("role").notNull().default("user"),
+  disabled: integer("disabled").notNull().default(0),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 

@@ -195,6 +195,7 @@ export function Studio({ content, settings }: { content: SiteContent; settings: 
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authStatusText, setAuthStatusText] = useState("");
   const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   const filteredRecords = records.filter((record) => selectedRecordCategory === "all" || record.category === selectedRecordCategory);
   const selectedRecord: PublishedRecord | undefined = filteredRecords.find((record) => record.id === selectedRecordId) ?? filteredRecords[0];
@@ -365,6 +366,34 @@ export function Studio({ content, settings }: { content: SiteContent; settings: 
     await fetch("/api/auth/logout", { method: "POST" });
     setAuthUser(null);
     setAuthOpen(false);
+  }
+
+  async function logoutEverywhere() {
+    if (!window.confirm("在所有设备上退出登录？包括这台设备。")) return;
+    await fetch("/api/auth/logout-all", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    setAuthUser(null);
+    setAuthOpen(false);
+  }
+
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const current = String(form.get("current") ?? "");
+    const next = String(form.get("next") ?? "");
+    if (next !== String(form.get("confirm") ?? "")) {
+      setPasswordStatus({ tone: "error", text: "两次输入的新密码不一致。" });
+      return;
+    }
+    const target = event.currentTarget;
+    try {
+      const response = await fetch("/api/auth/password", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ current, next }) });
+      const payload = (await response.json()) as { message?: string; error?: string };
+      if (!response.ok) throw new Error(payload.error || "修改失败。");
+      target.reset();
+      setPasswordStatus({ tone: "success", text: payload.message || "密码已修改。" });
+    } catch (error) {
+      setPasswordStatus({ tone: "error", text: error instanceof Error ? error.message : "修改失败。" });
+    }
   }
 
   async function submitFeedback(event: FormEvent<HTMLFormElement>) {
@@ -749,6 +778,17 @@ export function Studio({ content, settings }: { content: SiteContent; settings: 
                   {authUser.role === "admin" && <a className="button button-primary" href="/admin">进入内容后台<span aria-hidden="true">↗</span></a>}
                   <button type="button" className="button button-ghost" onClick={logoutUser}>退出登录</button>
                 </div>
+                <details className="account-security">
+                  <summary>账户安全</summary>
+                  <form className="auth-form" onSubmit={changePassword}>
+                    <label className="field"><span>当前密码</span><input name="current" type="password" autoComplete="current-password" required /></label>
+                    <label className="field"><span>新密码（至少 8 位）</span><input name="next" type="password" autoComplete="new-password" minLength={8} required /></label>
+                    <label className="field"><span>再输入一次新密码</span><input name="confirm" type="password" autoComplete="new-password" minLength={8} required /></label>
+                    <button type="submit" className="button button-primary">修改密码</button>
+                    {passwordStatus && <p className={`form-status ${passwordStatus.tone}`} role="status">{passwordStatus.text}</p>}
+                  </form>
+                  <button type="button" className="text-link account-logout-all" onClick={() => void logoutEverywhere()}>在所有设备退出登录</button>
+                </details>
               </div>
             ) : (
               <>

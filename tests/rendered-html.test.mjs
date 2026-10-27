@@ -141,3 +141,28 @@ test("keeps accounts, the online admin, and security hardening", async () => {
   assert.match(worker, /请求来源不被允许/);
   assert.match(entriesRoute, /需要管理员登录/);
 });
+
+test("manages feedback tickets, users, passwords, and owner notifications", async () => {
+  const [feedbackAdmin, usersAdmin, password, logoutAll, notify, feedbackRoute, auth, migration] = await Promise.all([
+    source("app/api/admin/feedback/route.ts"),
+    source("app/api/admin/users/route.ts"),
+    source("app/api/auth/password/route.ts"),
+    source("app/api/auth/logout-all/route.ts"),
+    source("app/api/_lib/notify.ts"),
+    source("app/api/feedback/route.ts"),
+    source("app/api/_lib/auth.ts"),
+    source("drizzle/0008_tickets_and_users.sql"),
+  ]);
+  assert.match(feedbackAdmin, /export async function PATCH/);
+  assert.match(feedbackAdmin, /export async function DELETE/);
+  assert.match(feedbackAdmin, /"new", "following", "done", "invalid"/);
+  assert.match(usersAdmin, /不能对自己的账户执行这个操作/);
+  assert.match(usersAdmin, /不能删除管理员账户/);
+  assert.match(password, /当前密码不正确/);
+  assert.match(password, /deleteUserSessions\(user\.id, await currentTokenHash\(request\)\)/);
+  assert.match(logoutAll, /keepCurrent/);
+  assert.match(notify, /TELEGRAM_BOT_TOKEN/);
+  assert.match(feedbackRoute, /notifyOwner/);
+  assert.match(auth, /eq\(users\.disabled, 0\)/);
+  assert.match(migration, /ADD `disabled`/);
+});
