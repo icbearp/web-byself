@@ -50,12 +50,13 @@ const doing: Array<{ en: string; title: string; copy: string; cta: string; works
   { en: "share", title: "做内容", copy: "AI、金融、Web3 与职场，在多个平台持续输出，也把方法写成教程和记录。", cta: "看内容", workspace: "home", target: "content" },
 ];
 
-const services: Array<{ tone: Tone; tag: string; title: string; copy: string; fit: string; deliver: string; proof: string }> = [
+// link：有自己独立网站的业务，按钮直接跳转过去，而不是填写合作留言。
+const services: Array<{ tone: Tone; tag: string; title: string; copy: string; fit: string; deliver: string; proof: string; link?: { href: string; label: string } }> = [
   { tone: "sky", tag: "已跑通", title: "AI 动效视频定制", copy: "AI 主播口播 + 信息动效 + 剪辑合成，适合产品讲解、知识科普和品牌短片。", fit: "需要持续产出讲解类视频的品牌、机构与个人", deliver: "分镜脚本、竖屏 / 横屏成片、可复用的动效模组", proof: "75 秒产品讲解样片与 5 段动效模组（自制样片）" },
   { tone: "lilac", tag: "亲身走完", title: "品牌从 0 到 1", copy: "公司注册、商业计划书、品牌战略、标志与商标初检、包装和打样，我自己的品牌全部走过一遍。", fit: "准备创业的大学生、想做自有品牌的小商家", deliver: "品牌定位与故事、视觉与包装方案、打样说明", proof: "熊奇 / BEARUP 战略路线图、商业计划书、三系列包装" },
   { tone: "mint", tag: "可上线", title: "网站与工具搭建", copy: "个人主页、品牌官网、订阅商店和内容后台，从设计到上线，带后台和安全加固。", fit: "需要一个能长期维护网站的个人与小团队", deliver: "可在线编辑的网站、部署与使用说明", proof: "本站、熊奇公司官网、会员订阅商店" },
   { tone: "sky", tag: "多平台", title: "内容与自媒体合作", copy: "在小红书、领英、公众号、币安广场和 X 输出 AI、金融、Web3 与职场内容。", fit: "AI 工具、金融科技、Web3 项目与职场类品牌", deliver: "测评、教程、联合内容与多平台分发", proof: "五个平台账号持续运营" },
-  { tone: "lilac", tag: "在营业", title: "海外会员代订阅", copy: "代订阅国外 AI 会员服务，多种付款方式，订单可查询，人工核款。", fit: "需要海外 AI 工具但付款不便的个人与团队", deliver: "订阅开通与订单查询", proof: "自建订阅商店与商家后台" },
+  { tone: "lilac", tag: "在营业", title: "海外会员代订阅", copy: "代订阅国外 AI 会员服务，多种付款方式，订单可查询，人工核款。", fit: "需要海外 AI 工具但付款不便的个人与团队", deliver: "订阅开通与订单查询", proof: "自建订阅商店与商家后台", link: { href: "https://subscription-store.otafuku2599.workers.dev/", label: "进入订阅商店" } },
   { tone: "mint", tag: "自有品牌", title: "BEARUP 袜子团购与定制", copy: "运动、商务、休闲三个系列，可做团购、企业礼品和渠道合作。", fit: "企业礼品、运动社团、渠道与店铺", deliver: "现货供应、组合礼盒与包装定制", proof: "商标、货源与包装打样均已完成" },
 ];
 
@@ -557,7 +558,9 @@ export function Studio({ content, settings }: { content: SiteContent; settings: 
                   <div><dt>交付</dt><dd>{item.deliver}</dd></div>
                   <div><dt>依据</dt><dd>{item.proof}</dd></div>
                 </dl>
-                <button type="button" className="service-cta" onClick={() => startCooperation(item.title)}>聊这个合作<span aria-hidden="true">→</span></button>
+                {item.link
+                  ? <a className="service-cta" href={item.link.href} target="_blank" rel="noreferrer">{item.link.label}<span aria-hidden="true">↗</span></a>
+                  : <button type="button" className="service-cta" onClick={() => startCooperation(item.title)}>聊这个合作<span aria-hidden="true">→</span></button>}
               </article>
             ))}
           </div>

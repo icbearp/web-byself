@@ -39,6 +39,7 @@ test("server-renders the redesigned studio homepage", async () => {
   assert.match(html, /我的成长之路/);
   assert.match(html, /可以一起做的事/);
   assert.match(html, /AI 动效视频定制/);
+  assert.match(html, /href="https:\/\/subscription-store\.otafuku2599\.workers\.dev\/"[^>]*>进入订阅商店/);
   assert.match(html, /Dear Friend/);
   assert.match(html, /实用教程/);
   assert.match(html, /随心记录/);
